@@ -6,7 +6,10 @@ Status: ☐ not run · ✅ passed · ❌ failed (with note)
 - ✅ ENV-1 Windows 11, GTX 1060 3 GB visible to `nvidia-smi`, driver 582.28 (2026-10-21)
 - ✅ ENV-2 Python 3.12 available via `py -3.12` (2026-10-21)
 - ✅ ENV-3 Armenian text (incl. ՞ and ։) displays correctly in PowerShell (2026-10-21)
-- ☐ ENV-4 CTranslate2 / faster-whisper runs on the GPU (int8)
+- ✅ ENV-4 CTranslate2 / faster-whisper runs on the GPU (int8) (2026-10-21, `scripts/gpu_smoke_test.py`)
+  - Supported GPU compute types reported: float32, int8, int8_float32
+  - Whisper tiny, int8_float32, 5 s synthetic tone: 0.67 s with `temperature=0.0` (no retries);
+    4.01 s with default temperature fallback (retries). Synthetic audio only — not a real speed benchmark.
 - ☐ ENV-5 Program is run as a normal (non-admin) user from `D:\Em\mathrix`
 
 ## R1 — Two audio sources at once
