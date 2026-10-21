@@ -1,0 +1,41 @@
+# --- Python / virtual environment ---
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# --- Model weights and caches (brief: "Do not commit model weights") ---
+models/
+.cache/
+hf_cache/
+*.bin
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.gguf
+
+# --- Audio recordings (brief: "Do not commit ... audio recordings") ---
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.m4a
+*.opus
+*.webm
+recordings/
+eval/audio/
+
+# --- Secrets (brief: "Do not commit ... API keys") ---
+.env
+.env.*
+*.key
+secrets*
+
+# --- Logs and editor files ---
+logs/
+*.log
+.idea/
+.vscode/
