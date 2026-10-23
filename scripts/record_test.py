@@ -10,6 +10,7 @@ default speakers are used (and printed).
 
 import argparse
 import queue
+import re
 import sys
 import time
 import wave
@@ -31,7 +32,10 @@ def main() -> None:
     parser.add_argument("--mic", type=int, help="microphone device index (see scripts/list_devices.py)")
     parser.add_argument("--system", type=int, help="loopback device index (see scripts/list_devices.py)")
     parser.add_argument("--seconds", type=float, default=15.0)
+    parser.add_argument("--label", help="added to the file names, e.g. laptop -> <time>_laptop_mic.wav")
     args = parser.parse_args()
+    if args.label is not None and not re.fullmatch(r"[A-Za-z0-9_-]+", args.label):
+        raise ValueError("--label may only contain letters, digits, _ and -")
 
     p = pyaudio.PyAudio()
     try:
@@ -68,6 +72,8 @@ def main() -> None:
         out_dir = PROJECT_DIR / "recordings"
         out_dir.mkdir(exist_ok=True)
         stamp = time.strftime("%Y%m%d-%H%M%S")
+        if args.label:
+            stamp += f"_{args.label}"
 
         print(f"\nWall-clock time: {wall_seconds:.1f} s")
         for capture in captures:

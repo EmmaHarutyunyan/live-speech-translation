@@ -23,14 +23,31 @@ Status: ☐ not run · ✅ passed · ❌ failed (with note)
 - ✅ R1-4 User heard the video normally in headphones while capturing (2026-10-23).
 
 ### M1 measurements and notes
-- Mic peak levels (0 = silent, 1 = max): room noise ~0.003 · laptop mic, normal speech ~0.055 ·
-  headset cable mic (3-ring plug, replaces the laptop mic when plugged in) ~0.020 · laptop mic without
-  headphones while a video plays ~0.230 (video leaks into the mic).
+- Mic levels, normal speech, 10 s, nothing playing unless noted (corrected 2026-10-23 with labelled recordings;
+  earlier values were assigned to the wrong mic — the earlier "laptop ~0.055" recording was the headset mic):
+  | Setup | Active mic (channel correlation) | Peak | RMS |
+  |---|---|---|---|
+  | Room noise, nobody speaking | — | ~0.003 | — |
+  | Headphones unplugged (`laptop`) | laptop 2-mic array (+0.75) | 0.137 | 0.0067 |
+  | Headphones plugged in, cable mic hanging (`headset`) | headset cable mic (+0.99) | 0.008 | 0.0013 |
+  | Headset cable mic held 10–15 cm from mouth (`headset_close`) | headset cable mic (+1.00) | 0.011 | 0.0018 |
+  | Headphones unplugged, video playing on speakers | laptop array (+0.84) | 0.230 | 0.0125 |
+  Earlier unlabelled headset recordings peaked at 0.020–0.055: the headset mic is weak AND variable.
+- Check for which mic is active: channel correlation from `scripts/convert_test.py` —
+  ~+0.75–0.84 = laptop array, ~+1.00 = headset cable mic (one mic copied to both channels).
 - WASAPI loopback delivers no data while nothing plays: 0 blocks in 15 s of silence; when a video started
   late, the first block arrived after 1.47 s (see DECISIONS.md D-010).
-- OPEN ISSUE: twice the mic recording seemed to contain no voice; no diagnostics were captured, cause not
-  confirmed (likely the headphone plug not fully inserted). Rule: always read the printed peak level first;
-  push the plug in fully before a session. Close at M7 if it does not reappear.
+- OPEN ISSUE: twice the mic recording seemed to contain no voice; no diagnostics were captured. Likely cause
+  (updated): with headphones plugged in, the weak and variable headset cable mic was recording (see table).
+  Rule: always read the printed peak level and correlation first. Close once the final headphone setup
+  (D-012) is verified.
+
+### M2 sub-step 1 — 48 kHz stereo → 16 kHz mono (`scripts/convert_test.py`, 2026-10-23)
+- ✅ Block-by-block (10 ms) streaming conversion keeps the duration exactly (15.02→15.02 s, 15.03→15.03 s,
+  10.01→10.01 s): no audio lost or duplicated at block edges.
+- ✅ Averaging the two mic channels does not cancel the voice (correlation always positive; mono RMS ≈ channel RMS).
+- ✅ Converted files sound clean (no clicks); the laptop's high-frequency noise above 8 kHz disappears.
+- ☐ Recording 3 (`headset_video`: video playing + speaking) — postponed until the final headphone setup is chosen.
 
 ## R2 — Armenian transcription
 - ☐ R2-1 Evaluation set exists (short Armenian clips + correct text; audio kept local, not committed)

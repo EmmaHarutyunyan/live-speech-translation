@@ -72,12 +72,30 @@ Each entry: what was decided, why, what else was considered, status. Newest at t
   ignored blocksize, buffer underruns); `sounddevice` (not evaluated).
 - **Status:** Verified 2026-10-23.
 
-## D-012 — Use headphones during calls (provisional) (2026-10-23)
-- **Decision:** Wear headphones in test calls and in the interview.
-- **Why:** Without headphones, the call audio played by the laptop speakers is picked up by the mic and would
-  be labelled "Me" (peak 0.230 vs 0.055 in tests). Echo handling is out of scope in the brief, so we avoid
-  the echo instead of handling it.
-- **Trade-off:** The current headphones have a cable mic (3-ring plug) that replaces the laptop mic and is
-  ~3x quieter (peak ~0.020). Whether this is enough for Armenian ASR is measured in M2/M3; alternative:
-  headphones without a mic (2-ring plug), which keep the laptop mic active.
-- **Status:** Provisional.
+## D-012 — Laptop mic + headphones without a mic during calls (provisional; corrected 2026-10-23)
+- **Decision:** Wear headphones (so call audio does not leak into the mic and get labelled "Me"; echo
+  handling is out of scope in the brief), but keep the laptop's built-in mic as the "Me" input.
+- **Why (measured, see TESTS.md M1 table):** With the current 3-ring headphones plugged in, Windows records
+  their cable mic instead of the laptop mic, under the same device name. That mic is weak and variable:
+  peak 0.008 hanging, 0.011 held 10–15 cm from the mouth, 0.020–0.055 in earlier recordings — vs 0.137 for
+  the laptop mic. Holding it closer improved it only ~1.4x, so distance is not the main cause.
+- **Correction:** An earlier version of this entry said the headset mic was "~3x quieter than the laptop mic
+  (0.055)". That 0.055 recording was itself the headset mic (correlation +1.00); corrected with labelled recordings.
+- **Options to get "laptop mic + headphones":** (1) headphones without a mic (2-ring plug); (2) a TRRS→TRS
+  audio-only adapter; (3) a Realtek setting that treats the jack device as "headphones" (system setting —
+  only with the user's explicit OK; the user prefers not to change Windows settings for now).
+  Verification: correlation ~+0.75 while headphones are plugged in.
+- **Rejected:** headset cable mic (too weak/variable); Windows "Microphone Boost" (amplifies noise too; system setting).
+- **Status:** Provisional — waiting for the hardware choice.
+
+## D-013 — soxr streaming resampler for 48 kHz → 16 kHz (2026-10-23)
+- **Decision:** Average channels to mono, then resample with `soxr.ResampleStream` (soxr 1.1.0, quality "HQ")
+  block by block (`hylive/audio_convert.py`).
+- **Why:** Streaming keeps filter state between 10 ms blocks (no clicks at block edges); very simple API;
+  small dependency (requires only numpy). Verified: durations preserved exactly, clean sound, no channel
+  cancellation (TESTS.md, M2 sub-step 1).
+- **Alternatives:** PyAV `AudioResampler` (already installed, but more complex frame-based code); plain numpy
+  average-of-3 decimation (no install, but weak filter → aliasing); `scipy.signal.resample_poly` (large
+  install, no state between blocks → wrong for streaming).
+- **Source:** https://python-soxr.readthedocs.io/en/latest/soxr.html (`ResampleStream`, `resample_chunk(x, last=False)`)
+- **Status:** Verified 2026-10-23.

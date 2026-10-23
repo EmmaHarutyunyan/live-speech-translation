@@ -1,6 +1,6 @@
-# HANDOVER — next step: M2 (walking skeleton, mic only)
+# HANDOVER — M2 in progress (walking skeleton, mic only)
 
-Written 2026-10-21 at the end of M0; updated 2026-10-23 after M1. Both were done in the same Cowork
+Written 2026-10-21 at the end of M0; updated 2026-10-23 after M1 and M2 sub-step 1. Both were done in the same Cowork
 session (session 01); `chats/INDEX.md` needs updating accordingly.
 New session: read this file, then `CLAUDE.md` (project rules). Look up details in `PLAN.md`,
 `DECISIONS.md` and `TESTS.md` only when needed. The official Mathrix brief is the source of truth.
@@ -9,7 +9,7 @@ New session: read this file, then `CLAUDE.md` (project rules). Look up details i
 Python terminal program: capture microphone + system audio at the same time, transcribe spoken Armenian,
 translate to English, print each segment with time, speaker (`Me` / `Speaker 1`, `Speaker 2`, … stable for
 the session), Armenian original and English translation — at most 5 s after the end of a phrase.
-All models local. Deadline: 2026-11-01 23:59 Yerevan time. Budget ~20 h; ~4.1 h used (see TIMELOG.md).
+All models local. Deadline: 2026-11-01 23:59 Yerevan time. Budget ~20 h; ~5.0 h used (see TIMELOG.md).
 
 ## How we work (agreed)
 - The user (junior Python dev, new to ML/audio) wants to understand every decision; explain simply.
@@ -28,7 +28,7 @@ driver 582.28 (do not update — D-005) · Python 3.12.1 via `py -3.12` · Git 2
 · Armenian text displays correctly in PowerShell · VS Code has no Copilot extension.
 Installed in venv (pinned in `requirements.txt`): faster-whisper 1.2.1, ctranslate2 4.8.3,
 nvidia-cublas-cu12 12.9.2.10, nvidia-cudnn-cu12 9.27.0.42, onnxruntime 1.31.0, numpy 2.5.4,
-PyAudioWPatch 0.2.12.9.
+PyAudioWPatch 0.2.12.9, soxr 1.1.0.
 
 ## Done (M0 complete)
 - Project docs: PLAN.md, DECISIONS.md, TESTS.md, CLAUDE.md, chats/INDEX.md, .gitignore, requirements.txt
@@ -44,6 +44,15 @@ PyAudioWPatch 0.2.12.9.
 - `scripts/list_devices.py` (WASAPI devices only) and `scripts/record_test.py` (records both devices at
   once to `recordings/`, prints audio received, first-block delay, largest gap, peak level, problem flags).
 - Devices on this laptop: mic = 9, loopback = 10 (unchanged with headphones plugged in).
+- `record_test.py --label <name>` puts the label in the file names.
+
+## Done (M2 sub-step 1)
+- `hylive/audio_convert.py`: `to_float32_frames`, `to_mono`, `Resampler` (soxr `ResampleStream`, 48 kHz → 16 kHz).
+- `scripts/convert_test.py <wav>`: converts in 10 ms blocks, writes `<name>_16k.wav`, prints levels per
+  channel, mono mix and channel correlation (correlation tells which mic was active: ~+0.75 laptop, ~+1.00 headset).
+- Verified: durations preserved, clean sound, no cancellation (D-013).
+- Finding: with the 3-ring headphones plugged in, the weak headset cable mic replaces the laptop mic
+  (peak ~0.01 vs 0.137) → D-012 corrected: laptop mic + headphones without a mic.
 
 ## Tests passed (TESTS.md)
 ENV-1 GPU/driver · ENV-2 Python 3.12 · ENV-3 Armenian in terminal · ENV-4 GPU runs int8_float32 ·
@@ -62,12 +71,15 @@ values and one open issue (unexplained silent mic recordings) are in TESTS.md.
   retries it hallucinated "A-A-A-…"). Plan: `temperature=0.0` + VAD, decide after real-speech tests. (Pending)
 - D-010 WASAPI loopback sends NO data while nothing plays → segmenter must not wait for silence samples. (Pending, M2)
 - D-011 PyAudioWPatch for capture, WASAPI only. Verified.
-- D-012 Headphones in calls (avoids echo into "Me"); headset cable mic ~3x quieter than laptop mic. (Provisional)
+- D-012 Laptop mic + headphones WITHOUT a mic (headset cable mic too weak/variable; corrected). (Provisional, hardware pending)
+- D-013 soxr 1.1.0 streaming resampler, channels averaged to mono. Verified.
 - Lesson: request `int8_float32` explicitly — CTranslate2 silently falls back to float32 if float16 is requested on this GPU.
 
 ## Open items for the user
 - Ask Mathrix: public repo or collaborator access? Which calling app in the interview?
 - Confirm two helpers for live speaker tests (needed around M5 and M7).
+- Headphone setup: mic-less headphones (2-ring), TRRS→TRS adapter, or check whether Realtek Audio Console
+  exists. The user prefers NOT to change Windows settings for now.
 - Test the chat export (Settings → Privacy → Export data): is this session included, in what format?
 - Export session 01 to `chats/` and record it in `chats/INDEX.md` (final export at the very end).
 
@@ -77,11 +89,15 @@ M1 audio capture (2 h) → M2 walking skeleton, mic only (2.5 h) → M3 eval set
 → M7 README + rehearsal (2 h) · buffer 1.5 h.
 
 ## M2 plan (to be explained and approved step by step)
-Walking skeleton, mic only: capture → 16 kHz mono conversion → voice activity detection (Silero VAD) →
+Walking skeleton, mic only: capture → 16 kHz mono (done) → voice activity detection (Silero VAD) →
 faster-whisper (small model first, `temperature=0.0`, `int8_float32`) → translation (NLLB-200 distilled
 600M via CTranslate2 — to be verified) → terminal line with time, `Me`, HY, EN and measured latency.
-Open design points: how to resample 48 kHz stereo → 16 kHz mono (options and dependencies to compare);
-how the segmenter handles D-010; warm-up run at start-up (D-009); whether the headset mic level is enough.
+Open design points: how the segmenter handles D-010 (no loopback data during silence); warm-up run at
+start-up (D-009).
 
 ## Next step
-Explain the first M2 sub-step (16 kHz mono conversion: options and trade-offs) and wait for approval.
+1. Hear the user's headphone findings; verify the chosen setup with
+   `record_test.py --seconds 10 --label <name>` + `convert_test.py` (expect correlation ~+0.75 = laptop mic).
+2. Recording 3 (`headset_video`, or the new setup's name): video playing + speaking; mic must contain only
+   the user, system only the video.
+3. Explain M2 sub-step 2 (Silero VAD: what it is, how it splits speech into phrases) and wait for approval.
