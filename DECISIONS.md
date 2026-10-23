@@ -52,3 +52,32 @@ Each entry: what was decided, why, what else was considered, status. Newest at t
 - **Consequence:** Retries can break the 5-second budget; without retries, non-speech produces garbage. Non-speech must be removed before ASR (VAD), and the first transcription after loading is slower (warm-up run at start-up).
 - **Plan:** Start with `temperature=0.0` + VAD in M2; measure on real Armenian speech in M2/M3 and decide then whether a limited fallback or a visible repetition check is needed.
 - **Status:** Pending measurement.
+
+## D-010 — WASAPI loopback sends no data during silence (finding; solution pending) (2026-10-23)
+- **Finding:** With nothing playing, the loopback device delivered 0 blocks in 15 s. When a video started
+  ~1.5 s after recording began, the first block arrived after 1.47 s; after that, no gaps.
+- **Consequence:** The segmenter must not wait for "silence after speech" samples that never arrive on the
+  system stream, or the last phrase before a quiet moment may never be printed.
+- **Options for M2:** (a) the program plays a silent output stream on the speakers to keep loopback
+  delivering data (common workaround — to be verified, not assumed); (b) close a phrase when no new audio
+  arrives for a set time, using the clock. Also to test: whether call apps keep sending audio when nobody speaks.
+- **Status:** Pending (M2).
+
+## D-011 — PyAudioWPatch for audio capture (2026-10-23)
+- **Decision:** Use PyAudioWPatch 0.2.12.9 (PortAudio V19.7.0) in callback mode; WASAPI devices only, for the mic too.
+- **Why:** Actively maintained (release Oct 6, 2026), Python 3.12 Windows wheel, loopback devices appear as
+  extra input devices so mic and system audio use the same code. Verified: device list, simultaneous capture
+  of both devices with no lost blocks.
+- **Alternatives:** `soundcard` (its PyPI page lists Windows issues: garbage single-channel recording,
+  ignored blocksize, buffer underruns); `sounddevice` (not evaluated).
+- **Status:** Verified 2026-10-23.
+
+## D-012 — Use headphones during calls (provisional) (2026-10-23)
+- **Decision:** Wear headphones in test calls and in the interview.
+- **Why:** Without headphones, the call audio played by the laptop speakers is picked up by the mic and would
+  be labelled "Me" (peak 0.230 vs 0.055 in tests). Echo handling is out of scope in the brief, so we avoid
+  the echo instead of handling it.
+- **Trade-off:** The current headphones have a cable mic (3-ring plug) that replaces the laptop mic and is
+  ~3x quieter (peak ~0.020). Whether this is enough for Armenian ASR is measured in M2/M3; alternative:
+  headphones without a mic (2-ring plug), which keep the laptop mic active.
+- **Status:** Provisional.

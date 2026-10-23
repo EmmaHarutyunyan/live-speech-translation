@@ -20,6 +20,7 @@ nvidia-cudnn-cu12==9.27.0.42
 onnxruntime==1.31.0
 packaging==26.3
 protobuf==7.36.2
+PyAudioWPatch==0.2.12.9
 PyYAML==6.0.3
 tokenizers==0.23.3
 tqdm==4.70.1

@@ -1,6 +1,7 @@
-# HANDOVER — start of session 02 (M1: audio capture)
+# HANDOVER — next step: M2 (walking skeleton, mic only)
 
-Written 2026-10-21 at the end of session 01 ("planning and setup").
+Written 2026-10-21 at the end of M0; updated 2026-10-23 after M1. Both were done in the same Cowork
+session (session 01); `chats/INDEX.md` needs updating accordingly.
 New session: read this file, then `CLAUDE.md` (project rules). Look up details in `PLAN.md`,
 `DECISIONS.md` and `TESTS.md` only when needed. The official Mathrix brief is the source of truth.
 
@@ -8,7 +9,7 @@ New session: read this file, then `CLAUDE.md` (project rules). Look up details i
 Python terminal program: capture microphone + system audio at the same time, transcribe spoken Armenian,
 translate to English, print each segment with time, speaker (`Me` / `Speaker 1`, `Speaker 2`, … stable for
 the session), Armenian original and English translation — at most 5 s after the end of a phrase.
-All models local. Deadline: 2026-11-01 23:59 Yerevan time. Budget ~20 h; ~2.5 h used in session 01.
+All models local. Deadline: 2026-11-01 23:59 Yerevan time. Budget ~20 h; ~4.1 h used (see TIMELOG.md).
 
 ## How we work (agreed)
 - The user (junior Python dev, new to ML/audio) wants to understand every decision; explain simply.
@@ -26,16 +27,28 @@ driver 582.28 (do not update — D-005) · Python 3.12.1 via `py -3.12` · Git 2
 · C: 26.6 GB free, D: 397 GB free · audio endpoints: `Микрофон (Realtek(R) Audio)`, `Динамики (Realtek(R) Audio)`
 · Armenian text displays correctly in PowerShell · VS Code has no Copilot extension.
 Installed in venv (pinned in `requirements.txt`): faster-whisper 1.2.1, ctranslate2 4.8.3,
-nvidia-cublas-cu12 12.9.2.10, nvidia-cudnn-cu12 9.27.0.42, onnxruntime 1.31.0, numpy 2.5.4.
+nvidia-cublas-cu12 12.9.2.10, nvidia-cudnn-cu12 9.27.0.42, onnxruntime 1.31.0, numpy 2.5.4,
+PyAudioWPatch 0.2.12.9.
 
 ## Done (M0 complete)
 - Project docs: PLAN.md, DECISIONS.md, TESTS.md, CLAUDE.md, chats/INDEX.md, .gitignore, requirements.txt
 - `scripts/gpu_smoke_test.py`: registers NVIDIA DLL folders from the venv, checks GPU + compute types,
   runs Whisper tiny on the GPU with `int8_float32` — PASSED.
-- Git (local only, branch `main`): `dcdb5a8` (docs), `be69054` (smoke test + decisions). No GitHub remote yet.
+- Git (local only, branch `main`): `dcdb5a8` (docs), `be69054` (smoke test + decisions), `f8dca82` (handover),
+  then the M1 commit. No GitHub remote yet.
+
+## Done (M1 complete)
+- `hylive/audio_capture.py`: `DeviceInfo`, `AudioChunk(source, data, captured_at)`, `get_device`,
+  `default_mic`, `default_loopback`, `DeviceCapture` (PortAudio callback → queue; native format 48 kHz,
+  2 ch, int16; 10 ms blocks; counts PortAudio status flags).
+- `scripts/list_devices.py` (WASAPI devices only) and `scripts/record_test.py` (records both devices at
+  once to `recordings/`, prints audio received, first-block delay, largest gap, peak level, problem flags).
+- Devices on this laptop: mic = 9, loopback = 10 (unchanged with headphones plugged in).
 
 ## Tests passed (TESTS.md)
-ENV-1 GPU/driver · ENV-2 Python 3.12 · ENV-3 Armenian in terminal · ENV-4 GPU runs int8_float32.
+ENV-1 GPU/driver · ENV-2 Python 3.12 · ENV-3 Armenian in terminal · ENV-4 GPU runs int8_float32 ·
+R1-1 to R1-4 (device list, flags, simultaneous capture, user still hears audio). Mic level reference
+values and one open issue (unexplained silent mic recordings) are in TESTS.md.
 
 ## Key decisions (details in DECISIONS.md)
 - D-001 System audio via Windows WASAPI loopback (VB-Cable only as fallback).
@@ -47,33 +60,28 @@ ENV-1 GPU/driver · ENV-2 Python 3.12 · ENV-3 Armenian in terminal · ENV-4 GPU
 - D-008 cuBLAS/cuDNN from pip in the venv, DLL folders registered at start-up. Verified.
 - D-009 Whisper temperature fallback multiplied latency (4.01 s vs 0.67 s on a synthetic tone; with no
   retries it hallucinated "A-A-A-…"). Plan: `temperature=0.0` + VAD, decide after real-speech tests. (Pending)
+- D-010 WASAPI loopback sends NO data while nothing plays → segmenter must not wait for silence samples. (Pending, M2)
+- D-011 PyAudioWPatch for capture, WASAPI only. Verified.
+- D-012 Headphones in calls (avoids echo into "Me"); headset cable mic ~3x quieter than laptop mic. (Provisional)
 - Lesson: request `int8_float32` explicitly — CTranslate2 silently falls back to float32 if float16 is requested on this GPU.
 
 ## Open items for the user
 - Ask Mathrix: public repo or collaborator access? Which calling app in the interview?
 - Confirm two helpers for live speaker tests (needed around M5 and M7).
-- Export session 01 to `chats/` and record it in `chats/INDEX.md`.
+- Test the chat export (Settings → Privacy → Export data): is this session included, in what format?
+- Export session 01 to `chats/` and record it in `chats/INDEX.md` (final export at the very end).
 
 ## Remaining milestones (PLAN.md)
 M1 audio capture (2 h) → M2 walking skeleton, mic only (2.5 h) → M3 eval set + ASR comparison (3.5 h)
 → M4 translation comparison (1.5 h) → M5 both streams + speaker ID (3.5 h) → M6 latency/reliability (2 h)
 → M7 README + rehearsal (2 h) · buffer 1.5 h.
 
-## M1 plan (agreed in principle, nothing started)
-Library: **PyAudioWPatch** (0.2.12.9, Oct 2026, cp312 Windows wheels; loopback devices appear as extra
-*input* devices, so mic and system audio share the same code). Alternative considered: `soundcard`
-(its PyPI page lists Windows issues: garbage single-channel recording, ignored blocksize, underruns).
-To verify, not assume: whether WASAPI loopback delivers no data while nothing is playing (affects timestamps).
-
-Sub-steps (each needs the user's approval):
-1. Install PyAudioWPatch into the venv; add it to requirements.txt.
-2. `scripts/list_devices.py` — print index, name, sample rate, channels, loopback flag. (R1-1)
-3. Capture module (`audio_capture.py`) + `scripts/record_test.py --mic N --system N --seconds 15` →
-   two WAV files in `recordings/` (git-ignored). Devices run at e.g. 48 kHz stereo; the pipeline will need
-   16 kHz mono (resampling decided in M1/M2). (R1-2, R1-3)
-4. Real test with headphones: Armenian YouTube video or Meet call playing while speaking; listen to both
-   files; user still hears audio normally (R1-4); record a few seconds of silence to check loopback behaviour.
-5. Tick TESTS.md, record the library decision in DECISIONS.md, commit.
+## M2 plan (to be explained and approved step by step)
+Walking skeleton, mic only: capture → 16 kHz mono conversion → voice activity detection (Silero VAD) →
+faster-whisper (small model first, `temperature=0.0`, `int8_float32`) → translation (NLLB-200 distilled
+600M via CTranslate2 — to be verified) → terminal line with time, `Me`, HY, EN and measured latency.
+Open design points: how to resample 48 kHz stereo → 16 kHz mono (options and dependencies to compare);
+how the segmenter handles D-010; warm-up run at start-up (D-009); whether the headset mic level is enough.
 
 ## Next step
-Explain sub-step 1 (installing PyAudioWPatch) and wait for the user's approval.
+Explain the first M2 sub-step (16 kHz mono conversion: options and trade-offs) and wait for approval.

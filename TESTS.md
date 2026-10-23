@@ -13,10 +13,24 @@ Status: ☐ not run · ✅ passed · ❌ failed (with note)
 - ☐ ENV-5 Program is run as a normal (non-admin) user from `D:\Em\mathrix`
 
 ## R1 — Two audio sources at once
-- ☐ R1-1 Program prints a list of input devices
-- ☐ R1-2 Mic and system-audio devices can be chosen by command-line flags
-- ☐ R1-3 Mic and system audio are captured at the same time during a real call
-- ☐ R1-4 The user still hears the call normally while capturing
+- ✅ R1-1 Program prints a list of input devices (2026-10-23, `scripts/list_devices.py`): WASAPI only;
+  mic = 9, loopback = 10, both 48 kHz / 2 ch. Same numbers with and without headphones plugged in.
+  (To be re-ticked when the logic is in the main program as `--list-devices`.)
+- ✅ R1-2 Devices chosen with `--mic` / `--system` (`scripts/record_test.py`); without flags the Windows
+  default mic and default-speaker loopback are used and printed. Wrong device kinds are refused with an error.
+- ✅ R1-3 Mic and system audio captured at the same time (2026-10-23): 15 s each, 10 ms blocks, largest gap
+  0.016 s, 0 problem flags. Tested with a YouTube video, not yet with a real call (repeat in M5/M7).
+- ✅ R1-4 User heard the video normally in headphones while capturing (2026-10-23).
+
+### M1 measurements and notes
+- Mic peak levels (0 = silent, 1 = max): room noise ~0.003 · laptop mic, normal speech ~0.055 ·
+  headset cable mic (3-ring plug, replaces the laptop mic when plugged in) ~0.020 · laptop mic without
+  headphones while a video plays ~0.230 (video leaks into the mic).
+- WASAPI loopback delivers no data while nothing plays: 0 blocks in 15 s of silence; when a video started
+  late, the first block arrived after 1.47 s (see DECISIONS.md D-010).
+- OPEN ISSUE: twice the mic recording seemed to contain no voice; no diagnostics were captured, cause not
+  confirmed (likely the headphone plug not fully inserted). Rule: always read the printed peak level first;
+  push the plug in fully before a session. Close at M7 if it does not reappear.
 
 ## R2 — Armenian transcription
 - ☐ R2-1 Evaluation set exists (short Armenian clips + correct text; audio kept local, not committed)
