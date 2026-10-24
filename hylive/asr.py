@@ -18,9 +18,10 @@ COMPUTE_TYPE = "int8_float32"  # the int8 type CTranslate2 supports on the GTX 1
 
 
 class Transcriber:
-    def __init__(self, model_name: str = "small", beam_size: int = 1):
+    def __init__(self, model_name: str = "small", beam_size: int = 1, initial_prompt: str | None = None):
         self.model_name = model_name
         self.beam_size = beam_size
+        self.initial_prompt = initial_prompt  # optional Armenian text given to Whisper as context (M3 test)
         self.model = WhisperModel(model_name, device="cuda", compute_type=COMPUTE_TYPE,
                                   download_root=str(MODELS_DIR))
 
@@ -38,5 +39,6 @@ class Transcriber:
             vad_filter=False,                   # we already cut the phrase with our own VAD (D-014)
             condition_on_previous_text=False,   # each phrase on its own: one bad phrase cannot spoil the next
             without_timestamps=True,            # we only need the text
+            initial_prompt=self.initial_prompt,
         )
         return " ".join(s.text.strip() for s in segments).strip()  # decoding runs while we read the segments

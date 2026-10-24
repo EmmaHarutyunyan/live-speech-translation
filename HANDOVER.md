@@ -9,7 +9,7 @@ New session: read this file, then `CLAUDE.md` (project rules). Look up details i
 Python terminal program: capture microphone + system audio at the same time, transcribe spoken Armenian,
 translate to English, print each segment with time, speaker (`Me` / `Speaker 1`, `Speaker 2`, … stable for
 the session), Armenian original and English translation — at most 5 s after the end of a phrase.
-All models local. Deadline: 2026-11-01 23:59 Yerevan time. Budget ~20 h; ~6.7 h used (see TIMELOG.md). Target: finish by Oct 31.
+All models local. Deadline: 2026-11-01 23:59 Yerevan time. Budget ~20 h; ~6.9 h used (see TIMELOG.md). Target: finish by Oct 31.
 
 ## How we work (agreed)
 - The user (junior Python dev, new to ML/audio) wants to understand every decision; explain simply.
@@ -121,9 +121,17 @@ M1 audio capture (2 h) → M2 walking skeleton, mic only (2.5 h) → M3 eval set
 | Oct 30 | M6 latency/reliability + README | 3 |
 | Oct 31 | rehearsal, chat export, submit | 2 |
 
-## Next step: M3 (explain first, wait for approval)
-1. Evaluation set: ~10 prepared Armenian sentences (incl. Բ/Վ words, the brief's example), recorded by the user
-   with the laptop mic via `record_test.py --label`, correct text in a committed file (audio git-ignored, `eval/audio/`).
-2. Script that runs ASR on all clips and reports CER per setting.
-3. Compare, same model (large-v3): beam 1 vs beam 5; with/without an Armenian `initial_prompt`. Then at most one
-   community Armenian fine-tune, only if verified to exist and convertible to CTranslate2. Decide by numbers.
+## Next step: M3 in progress (1.5 h cap; ~0.15 h used)
+Already created (2026-10-25, approved by the user, NOT yet run):
+- `eval/sentences.txt` — 10 approved Armenian sentences (Բ/Վ words, the brief's example). Committed; audio is not.
+- `scripts/record_eval.py [--only NN] [--seconds 6]` — shows each sentence, Enter, records 6 s → `eval/audio/evalNN.wav`;
+  flags recordings with peak < 0.02.
+- `scripts/eval_asr.py [--model] [--beam-size] [--prompt]` — live path (mono → 16 kHz → VAD → Whisper), CER per
+  sentence + RESULT line (CER, avg/max ASR time). `--prompt` = neutral Armenian context sharing no words with the set.
+- `hylive/asr.py`: `Transcriber(..., initial_prompt=None)` (default unchanged).
+To do:
+1. User records the set (laptop mic, headphones unplugged): `scripts/record_eval.py`.
+2. Run: `eval_asr.py --beam-size 1`, `--beam-size 5`, `--beam-size 5 --prompt`.
+3. Decision rule (set in advance): lowest CER with max ASR time ≤ ~2.5 s; if beam 5 / prompt gains < ~2 points CER,
+   keep the simpler/faster setting. Record in TESTS.md + DECISIONS.md (update D-015), set the live default.
+4. Optional, only if time remains in the cap: at most one verified community Armenian fine-tune.
