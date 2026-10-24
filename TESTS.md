@@ -49,6 +49,18 @@ Status: ☐ not run · ✅ passed · ❌ failed (with note)
 - ✅ Converted files sound clean (no clicks); the laptop's high-frequency noise above 8 kHz disappears.
 - ☐ Recording 3 (`headset_video`: video playing + speaking) — postponed until the final headphone setup is chosen.
 
+### M2 sub-step 2 — voice activity detection + segmenter (`scripts/vad_test.py`, 2026-10-25)
+Settings: threshold 0.5, min silence 500 ms, max segment 10 s, speech padding 100 ms; fed in 10 ms blocks like live audio.
+| Recording | Phrases (start–end, s) | Speech / total | Detected after phrase end | Processing per s of audio |
+|---|---|---|---|---|
+| `laptop_mic` (peak 0.137) | 1.44–4.90, 5.69–8.20 | 6.0 / 10.0 s | 0.46 s, 0.47 s | 0.144 s (first run, includes model load) |
+| `headset_mic` (peak 0.008) | 1.34–6.34, 7.29–8.55 | 6.3 / 10.0 s | 0.46 s, 0.48 s | 0.031 s |
+- ✅ Speech is split into phrases; leading, middle and trailing pauses are skipped.
+- ✅ User listened to all 4 segment files: correct phrases, nothing cut off at start or end.
+- ✅ End-of-phrase detection costs ~0.47 s of the 5 s latency budget.
+- ✅ VAD is fast enough for live use (~3 % of real time after loading).
+- Note: VAD also detects the very quiet headset speech — this does NOT mean ASR will understand it (D-012 stands).
+
 ## R2 — Armenian transcription
 - ☐ R2-1 Evaluation set exists (short Armenian clips + correct text; audio kept local, not committed)
 - ☐ R2-2 CER/WER measured for each candidate model; results recorded in DECISIONS.md

@@ -1,6 +1,6 @@
 # HANDOVER — M2 in progress (walking skeleton, mic only)
 
-Written 2026-10-21 at the end of M0; updated 2026-10-23 after M1 and M2 sub-step 1. Both were done in the same Cowork
+Written 2026-10-21 at the end of M0; updated 2026-10-23 after M1 and M2 sub-step 1; 2026-10-25 after M2 sub-step 2. Both were done in the same Cowork
 session (session 01); `chats/INDEX.md` needs updating accordingly.
 New session: read this file, then `CLAUDE.md` (project rules). Look up details in `PLAN.md`,
 `DECISIONS.md` and `TESTS.md` only when needed. The official Mathrix brief is the source of truth.
@@ -9,7 +9,7 @@ New session: read this file, then `CLAUDE.md` (project rules). Look up details i
 Python terminal program: capture microphone + system audio at the same time, transcribe spoken Armenian,
 translate to English, print each segment with time, speaker (`Me` / `Speaker 1`, `Speaker 2`, … stable for
 the session), Armenian original and English translation — at most 5 s after the end of a phrase.
-All models local. Deadline: 2026-11-01 23:59 Yerevan time. Budget ~20 h; ~5.0 h used (see TIMELOG.md).
+All models local. Deadline: 2026-11-01 23:59 Yerevan time. Budget ~20 h; ~5.6 h used (see TIMELOG.md).
 
 ## How we work (agreed)
 - The user (junior Python dev, new to ML/audio) wants to understand every decision; explain simply.
@@ -28,7 +28,8 @@ driver 582.28 (do not update — D-005) · Python 3.12.1 via `py -3.12` · Git 2
 · Armenian text displays correctly in PowerShell · VS Code has no Copilot extension.
 Installed in venv (pinned in `requirements.txt`): faster-whisper 1.2.1, ctranslate2 4.8.3,
 nvidia-cublas-cu12 12.9.2.10, nvidia-cudnn-cu12 9.27.0.42, onnxruntime 1.31.0, numpy 2.5.4,
-PyAudioWPatch 0.2.12.9, soxr 1.1.0.
+PyAudioWPatch 0.2.12.9, soxr 1.1.0,
+silero-vad 6.2.3, torch 2.14.1+cpu.
 
 ## Done (M0 complete)
 - Project docs: PLAN.md, DECISIONS.md, TESTS.md, CLAUDE.md, chats/INDEX.md, .gitignore, requirements.txt
@@ -54,6 +55,14 @@ PyAudioWPatch 0.2.12.9, soxr 1.1.0.
 - Finding: with the 3-ring headphones plugged in, the weak headset cable mic replaces the laptop mic
   (peak ~0.01 vs 0.137) → D-012 corrected: laptop mic + headphones without a mic.
 
+## Done (M2 sub-step 2)
+- `hylive/segmenter.py`: `Segment(source, audio, start_s, end_s, ended_at)`, `load_vad_model()`,
+  `Segmenter.process(samples)` / `flush()` (VADIterator on 512-sample windows, 0.3 s pre-roll,
+  max segment 10 s, min silence 500 ms, padding 100 ms).
+- `scripts/vad_test.py <wav> [--threshold] [--min-silence-ms] [--max-segment-s]`: feeds a recording in 10 ms
+  blocks, prints phrases + "detected after", saves `recordings/segments/<name>/segNN.wav`.
+- Verified on laptop_mic and headset_mic: correct phrases, not clipped, end detected ~0.47 s after speech, ~3 % CPU.
+
 ## Tests passed (TESTS.md)
 ENV-1 GPU/driver · ENV-2 Python 3.12 · ENV-3 Armenian in terminal · ENV-4 GPU runs int8_float32 ·
 R1-1 to R1-4 (device list, flags, simultaneous capture, user still hears audio). Mic level reference
@@ -73,6 +82,7 @@ values and one open issue (unexplained silent mic recordings) are in TESTS.md.
 - D-011 PyAudioWPatch for capture, WASAPI only. Verified.
 - D-012 Laptop mic + headphones WITHOUT a mic (headset cable mic too weak/variable; corrected). (Provisional, hardware pending)
 - D-013 soxr 1.1.0 streaming resampler, channels averaged to mono. Verified.
+- D-014 silero-vad 6.2.3 VADIterator + own segmenter (0.5 / 500 ms / 10 s / 100 ms pad). Verified.
 - Lesson: request `int8_float32` explicitly — CTranslate2 silently falls back to float32 if float16 is requested on this GPU.
 
 ## Open items for the user
@@ -96,8 +106,6 @@ Open design points: how the segmenter handles D-010 (no loopback data during sil
 start-up (D-009).
 
 ## Next step
-1. Hear the user's headphone findings; verify the chosen setup with
-   `record_test.py --seconds 10 --label <name>` + `convert_test.py` (expect correlation ~+0.75 = laptop mic).
-2. Recording 3 (`headset_video`, or the new setup's name): video playing + speaking; mic must contain only
-   the user, system only the video.
-3. Explain M2 sub-step 2 (Silero VAD: what it is, how it splits speech into phrases) and wait for approval.
+1. M2 sub-step 3: transcription — send each segment to faster-whisper (start with "small", `int8_float32`,
+   `temperature=0.0`, language "hy"), measure Armenian text quality and time per segment. Explain first, wait for approval.
+2. Later: headphone setup decision (D-012) and recording 3 (video playing + speaking), needed by M5 at the latest.

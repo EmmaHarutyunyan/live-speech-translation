@@ -99,3 +99,20 @@ Each entry: what was decided, why, what else was considered, status. Newest at t
   install, no state between blocks → wrong for streaming).
 - **Source:** https://python-soxr.readthedocs.io/en/latest/soxr.html (`ResampleStream`, `resample_chunk(x, last=False)`)
 - **Status:** Verified 2026-10-23.
+
+## D-014 — Official silero-vad + own segmenter for phrase detection (2026-10-25)
+- **Decision:** Use `silero-vad` 6.2.3 (`VADIterator`, default model) with CPU torch 2.14.1+cpu, wrapped in our
+  own `hylive/segmenter.py` (512-sample windows, pre-roll buffer, max segment length, `Segment` output).
+  Settings: threshold 0.5, min silence 500 ms, speech padding 100 ms, max segment 10 s (to be tuned with real data).
+- **Why:** Official, maintained, documented streaming API; CPU torch is needed anyway for speaker embeddings
+  in M5 (D-002). Read from the installed source: `VADIterator` returns {'start': n} / {'end': n}, uses
+  hysteresis (start ≥ threshold, end < threshold − 0.15), default min silence only 100 ms (too short for
+  phrases), and has no maximum length — so the segmenter adds it.
+- **Verified:** phrases correct and not clipped (user listened), end detected ~0.47 s after speech ends,
+  ~3 % CPU of real time (TESTS.md, M2 sub-step 2). torch is the CPU build (`torch.version.cuda` = None).
+- **Alternatives:** the Silero ONNX model bundled inside faster-whisper (no install, but an internal,
+  whole-file wrapper with a custom export — not a documented streaming API); `webrtcvad` (older, generally
+  less accurate on noisy audio).
+- **Known warning:** `torch.jit.load is deprecated` (FutureWarning from silero_vad's default model loader).
+  Harmless now; possible cleanup: `load_silero_vad(onnx=True)` (onnxruntime already installed) — not changed, untested.
+- **Status:** Verified 2026-10-25.
