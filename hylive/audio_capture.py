@@ -92,3 +92,14 @@ class DeviceCapture:
     def stop(self) -> None:
         self.stream.stop_stream()
         self.stream.close()
+
+
+def recordable_devices(p: pyaudio.PyAudio) -> list[DeviceInfo]:
+    """All WASAPI devices that can be recorded: microphones and loopback devices."""
+    wasapi_index = p.get_host_api_info_by_type(pyaudio.paWASAPI)["index"]
+    devices = []
+    for i in range(p.get_device_count()):
+        info = p.get_device_info_by_index(i)
+        if info["hostApi"] == wasapi_index and info["maxInputChannels"] > 0:
+            devices.append(_to_device_info(info))
+    return devices

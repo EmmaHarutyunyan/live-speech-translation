@@ -1,6 +1,6 @@
-# HANDOVER — M2 in progress (walking skeleton, mic only)
+# HANDOVER — M2 complete; next: M3 (Armenian ASR accuracy)
 
-Written 2026-10-21 at the end of M0; updated 2026-10-23 after M1 and M2 sub-step 1; 2026-10-25 after M2 sub-step 2. Both were done in the same Cowork
+Written 2026-10-21 at the end of M0; updated 2026-10-23 after M1 and M2 sub-step 1; 2026-10-25 after M2 (complete). Both were done in the same Cowork
 session (session 01); `chats/INDEX.md` needs updating accordingly.
 New session: read this file, then `CLAUDE.md` (project rules). Look up details in `PLAN.md`,
 `DECISIONS.md` and `TESTS.md` only when needed. The official Mathrix brief is the source of truth.
@@ -9,7 +9,7 @@ New session: read this file, then `CLAUDE.md` (project rules). Look up details i
 Python terminal program: capture microphone + system audio at the same time, transcribe spoken Armenian,
 translate to English, print each segment with time, speaker (`Me` / `Speaker 1`, `Speaker 2`, … stable for
 the session), Armenian original and English translation — at most 5 s after the end of a phrase.
-All models local. Deadline: 2026-11-01 23:59 Yerevan time. Budget ~20 h; ~5.6 h used (see TIMELOG.md).
+All models local. Deadline: 2026-11-01 23:59 Yerevan time. Budget ~20 h; ~6.7 h used (see TIMELOG.md). Target: finish by Oct 31.
 
 ## How we work (agreed)
 - The user (junior Python dev, new to ML/audio) wants to understand every decision; explain simply.
@@ -29,7 +29,8 @@ driver 582.28 (do not update — D-005) · Python 3.12.1 via `py -3.12` · Git 2
 Installed in venv (pinned in `requirements.txt`): faster-whisper 1.2.1, ctranslate2 4.8.3,
 nvidia-cublas-cu12 12.9.2.10, nvidia-cudnn-cu12 9.27.0.42, onnxruntime 1.31.0, numpy 2.5.4,
 PyAudioWPatch 0.2.12.9, soxr 1.1.0,
-silero-vad 6.2.3, torch 2.14.1+cpu.
+silero-vad 6.2.3, torch 2.14.1+cpu, transformers. Models in `models/`: faster-whisper small,
+medium, large-v3; NLLB converted to `models/nllb-200-distilled-600M-ct2-int8`.
 
 ## Done (M0 complete)
 - Project docs: PLAN.md, DECISIONS.md, TESTS.md, CLAUDE.md, chats/INDEX.md, .gitignore, requirements.txt
@@ -63,6 +64,16 @@ silero-vad 6.2.3, torch 2.14.1+cpu.
   blocks, prints phrases + "detected after", saves `recordings/segments/<name>/segNN.wav`.
 - Verified on laptop_mic and headset_mic: correct phrases, not clipped, end detected ~0.47 s after speech, ~3 % CPU.
 
+## Done (M2 complete)
+- `hylive/gpu.py` (`register_nvidia_dlls`), `hylive/asr.py` (`Transcriber`: large-v3 default, beam 1, temperature 0,
+  language hy, no internal VAD, no previous-text conditioning, warm-up), `hylive/translate.py` (`Translator`: NLLB
+  CTranslate2 int8 CPU, hye_Armn → eng_Latn).
+- `hylive/__main__.py`: `python -m hylive [--list-devices] [--mic N] [--asr-model] [--min-silence-ms] [--max-segment-s]`;
+  two threads (D-017); prints `[hh:mm:ss] Me`, HY, EN, latency (ASR, translation, queue); exit summary
+  "phrases detected / printed" + PortAudio problem flags.
+- Test scripts: `scripts/asr_test.py <wav> [--model] [--beam-size]`, `scripts/mt_test.py [--device]`.
+- Live results: latency 3.0–3.6 s per sentence, 4.8 s for two merged sentences; ASR is the weakest link.
+
 ## Tests passed (TESTS.md)
 ENV-1 GPU/driver · ENV-2 Python 3.12 · ENV-3 Armenian in terminal · ENV-4 GPU runs int8_float32 ·
 R1-1 to R1-4 (device list, flags, simultaneous capture, user still hears audio). Mic level reference
@@ -83,6 +94,9 @@ values and one open issue (unexplained silent mic recordings) are in TESTS.md.
 - D-012 Laptop mic + headphones WITHOUT a mic (headset cable mic too weak/variable; corrected). (Provisional, hardware pending)
 - D-013 soxr 1.1.0 streaming resampler, channels averaged to mono. Verified.
 - D-014 silero-vad 6.2.3 VADIterator + own segmenter (0.5 / 500 ms / 10 s / 100 ms pad). Verified.
+- D-015 Whisper large-v3 ASR baseline (CER 21 % vs medium 37 %, small 43 %; ~1.8 s/phrase). Provisional until M3.
+- D-016 NLLB-200 600M, CTranslate2 int8 on CPU (~0.5 s). Non-commercial license. Verified.
+- D-017 Two threads + Event-based shutdown (fixed lost phrases on Ctrl+C). Verified.
 - Lesson: request `int8_float32` explicitly — CTranslate2 silently falls back to float32 if float16 is requested on this GPU.
 
 ## Open items for the user
@@ -98,14 +112,18 @@ M1 audio capture (2 h) → M2 walking skeleton, mic only (2.5 h) → M3 eval set
 → M4 translation comparison (1.5 h) → M5 both streams + speaker ID (3.5 h) → M6 latency/reliability (2 h)
 → M7 README + rehearsal (2 h) · buffer 1.5 h.
 
-## M2 plan (to be explained and approved step by step)
-Walking skeleton, mic only: capture → 16 kHz mono (done) → voice activity detection (Silero VAD) →
-faster-whisper (small model first, `temperature=0.0`, `int8_float32`) → translation (NLLB-200 distilled
-600M via CTranslate2 — to be verified) → terminal line with time, `Me`, HY, EN and measured latency.
-Open design points: how the segmenter handles D-010 (no loopback data during silence); warm-up run at
-start-up (D-009).
+## Plan to Oct 31 (≈13 h left)
+| When | Work | h |
+|---|---|---|
+| next | M3: Armenian ASR accuracy (capped 1.5 h) | 1.5 |
+| Oct 26–27 | system stream in the live program + D-010 (no loopback data in silence); max segment ≈5–6 s | 1.5 |
+| Oct 28–29 | M5 speaker labels (needs 2 helpers + mic-less headphones / adapter) | 3.5 |
+| Oct 30 | M6 latency/reliability + README | 3 |
+| Oct 31 | rehearsal, chat export, submit | 2 |
 
-## Next step
-1. M2 sub-step 3: transcription — send each segment to faster-whisper (start with "small", `int8_float32`,
-   `temperature=0.0`, language "hy"), measure Armenian text quality and time per segment. Explain first, wait for approval.
-2. Later: headphone setup decision (D-012) and recording 3 (video playing + speaking), needed by M5 at the latest.
+## Next step: M3 (explain first, wait for approval)
+1. Evaluation set: ~10 prepared Armenian sentences (incl. Բ/Վ words, the brief's example), recorded by the user
+   with the laptop mic via `record_test.py --label`, correct text in a committed file (audio git-ignored, `eval/audio/`).
+2. Script that runs ASR on all clips and reports CER per setting.
+3. Compare, same model (large-v3): beam 1 vs beam 5; with/without an Armenian `initial_prompt`. Then at most one
+   community Armenian fine-tune, only if verified to exist and convertible to CTranslate2. Decide by numbers.

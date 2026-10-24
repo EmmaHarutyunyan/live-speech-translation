@@ -116,3 +116,36 @@ Each entry: what was decided, why, what else was considered, status. Newest at t
 - **Known warning:** `torch.jit.load is deprecated` (FutureWarning from silero_vad's default model loader).
   Harmless now; possible cleanup: `load_silero_vad(onnx=True)` (onnxruntime already installed) — not changed, untested.
 - **Status:** Verified 2026-10-25.
+
+## D-015 — Whisper large-v3 as the ASR baseline (2026-10-25)
+- **Decision rule, set before testing large-v3:** adopt it if it fits in VRAM, takes ≤ 3 s per phrase and has clearly
+  lower CER than medium (37 %); otherwise keep medium.
+- **Result (one sentence, TESTS.md):** small 43 % CER / ~0.5 s, medium 37 % / ~1.1 s, large-v3 21 % / ~1.8 s,
+  fits in 3 GB VRAM → large-v3 adopted. Load time ~20–30 s after the first download; warm-up ~12 s.
+- **Limits:** one sentence is not an evaluation; Armenian accuracy is still poor (Բ→Վ/Հ errors).
+  M3 measures cheap improvements (beam size, Armenian initial prompt) and at most one fine-tuned model, capped at 1.5 h.
+- **Alternatives:** small/medium (faster, much worse); large-v3-turbo (not tested yet).
+- **Status:** Provisional baseline until M3.
+
+## D-016 — NLLB-200 distilled 600M via CTranslate2 (CPU, int8) for translation (2026-10-25)
+- **Decision:** Convert `facebook/nllb-200-distilled-600M` once with
+  `ct2-transformers-converter --quantization int8` into `models/nllb-200-distilled-600M-ct2-int8`; run on the CPU;
+  source `hye_Armn`, target `eng_Latn` (`hylive/translate.py`, following the official CTranslate2 NLLB example).
+- **Why:** Explicit Armenian support; ~0.3–0.9 s per phrase on the CPU keeps the GPU free for Whisper; good English
+  from correct Armenian (TESTS.md).
+- **Setup detail:** set `$env:HF_HOME = "D:\Em\mathrix\models\hf_home"` before converting, otherwise the 2.5 GB
+  original model is downloaded to C: (D-004). Needs `transformers` (installed 2026-10-25).
+- **License:** NLLB-200 is released for non-commercial use (CC-BY-NC 4.0) — acceptable for this challenge; stated in README.
+- **Alternatives:** Helsinki-NLP opus-mt-hy-en (smaller/faster, not tested); NLLB on the GPU (not needed so far).
+- **Status:** Verified 2026-10-25.
+
+## D-017 — Two worker threads and an Event-based shutdown (2026-10-25)
+- **Decision:** PortAudio callback → audio queue → segmentation thread (convert + VAD) → phrase queue → processing
+  thread (ASR + translation + print). On Ctrl+C: stop capture, send STOP through both queues (the segmenter flushes
+  an unfinished phrase), and the main thread waits on a `threading.Event` set by the processing thread.
+- **Why:** Segmentation must keep up with live audio while ASR takes ~2 s per phrase. Waiting with
+  `Thread.join()`/`is_alive()` failed in testing: after Ctrl+C the main thread exited while a phrase was still being
+  transcribed (counters: detected 2, printed 1). Exact cause not confirmed (possibly Ctrl+C interrupting `join()`);
+  the Event avoids relying on it. Crashes in a thread are stored and re-raised by the main thread (fail loudly).
+- **Verified:** TESTS.md M2 live tests 1 and 2.
+- **Status:** Verified 2026-10-25.

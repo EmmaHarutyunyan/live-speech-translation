@@ -75,8 +75,8 @@ Settings: threshold 0.5, min silence 500 ms, max segment 10 s, speech padding 10
 - ☐ R4-3 Labels stay the same for the same person over a 10+ minute session (count wrong labels)
 
 ## R5 — Live terminal output
-- ☐ R5-1 Each segment shows time, speaker, Armenian original, English translation
-- ☐ R5-2 Segments appear while the conversation is still running
+- ✅ R5-1 Each segment shows time, speaker, Armenian original, English translation (mic side, 2026-10-25; re-check with system audio in M5)
+- ✅ R5-2 Segments appear while the conversation is still running (mic side, 2026-10-25)
 
 ## Constraints
 - ☐ C-1 Latency: logged per segment as (end of phrase → English line printed); report median, worst case, % under 5 s
@@ -87,3 +87,30 @@ Settings: threshold 0.5, min silence 500 ms, max segment 10 s, speech padding 10
 - ☐ D-1 README: setup + run + audio device setup; models + alternatives + reasons; architecture; limitations + improvements
 - ☐ D-2 `chats/` contains every Cowork session, full and unedited, one `.md` file each (checked against `chats/INDEX.md`)
 - ☐ D-3 Fresh rehearsal: program installed and audio setup working, live call with ≥ 2 people on the call side
+
+## M2 — ASR and translation tests (2026-10-25, recording `laptop_mic`, reference:
+"Բարև, ես հիմա փորձարկում եմ իմ խոսափողը, համակարգչով ոչինչ միացված չէ")
+| Whisper model (beam 1, int8_float32, temperature 0) | CER | WER | Time per phrase (GPU) |
+|---|---|---|---|
+| small | 43 % | 91 % | ~0.5 s |
+| medium | 37 % | 73 % | ~1.1 s |
+| large-v3 | 21 % | 73 % | ~1.8 s (fits in 3 GB VRAM) |
+- WER stays high because most large-v3 words are 1–2 letters off (Վարև/Բարև, խոսապողը/խոսափողը); CER is the fairer measure here.
+- Recurring error: Armenian Բ recognised as Վ or Հ (Վարև, Վատև, Հարև for Բարև) — target for M3.
+- NLLB-200 600M (CPU int8), ~0.3–0.9 s per phrase: correct Armenian → good English ("Nothing is connected to the
+  computer.", "Hi, how are you?"); misspelled ASR output → meaning often changes ("deactivating my speaker").
+  The ASR is the weakest link.
+
+## M2 — live program `python -m hylive` (microphone only, laptop mic, 2026-10-25)
+- ✅ Walking skeleton: speak → `[time] Me` + HY + EN in the terminal. `--list-devices` works in the main program.
+- Latency (end of phrase → English line): single sentences 3.0 / 3.3 / 3.4 / 3.6 s (ASR 1.6–2.5 s, translation
+  0.4–0.7 s, queue 0); two sentences merged into one phrase (pause < 0.5 s): **4.8 s** (ASR 3.0 s, translation 0.9 s).
+- RISK for M6: ASR time grows with the number of words in a phrase → lower `--max-segment-s` (≈5–6 s) and measure.
+- Live example: said «Վաղը ես կհանդիպեմ իմ ընկերներին» → HY «Ողաղը ես կահանդիպեմ իմ ընկերների» (CER 13 %)
+  → EN "I'll meet my friends tomorrow." (correct).
+- BUG FOUND AND FIXED: on Ctrl+C the main thread exited while the processing thread was still transcribing
+  (found with the new "phrases detected / printed" counters: detected 2, printed 1 at exit) — this likely lost
+  the sentences in the first live run. Fix: wait on a `threading.Event` instead of `Thread.join()` (D-017).
+  - ✅ Test 1: 3 sentences, wait, Ctrl+C → detected 3, printed 3, summary printed last.
+  - ✅ Test 2: Ctrl+C while still speaking → phrase rescued by `flush()`: detected 1 (1 at shutdown), printed 1.
+- ✅ 0 PortAudio problem flags in all runs.
