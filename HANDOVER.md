@@ -1,15 +1,15 @@
-# HANDOVER — M4 complete; next: system audio in the live program
+# HANDOVER — next: M5 speaker identification
 
-Written 2026-10-21 at the end of M0; updated 2026-10-23 after M1 and M2 sub-step 1; 2026-10-25 after M2 (complete). Both were done in the same Cowork
-session (session 01); `chats/INDEX.md` needs updating accordingly.
-New session: read this file, then `CLAUDE.md` (project rules). Look up details in `PLAN.md`,
-`DECISIONS.md` and `TESTS.md` only when needed. The official Mathrix brief is the source of truth.
+Updated 2026-10-25 18:50 (end of the day). Everything so far happened in ONE Cowork session (session 01).
+Read this file, then `CLAUDE.md`. Details: `TESTS.md` (all measurements), `DECISIONS.md` (D-001 … D-022),
+`TIMELOG.md`. The official Mathrix brief is the source of truth.
 
 ## Goal (from the brief)
 Python terminal program: capture microphone + system audio at the same time, transcribe spoken Armenian,
 translate to English, print each segment with time, speaker (`Me` / `Speaker 1`, `Speaker 2`, … stable for
 the session), Armenian original and English translation — at most 5 s after the end of a phrase.
-All models local. Deadline: 2026-11-01 23:59 Yerevan time. Budget ~20 h; ~7.5 h used (see TIMELOG.md). Target: finish by Oct 31.
+All models local. Deadline: 2026-11-01 23:59 Yerevan time (target: finish Oct 31).
+Budget ~20 h; **~9.2 h used**, ≈ 10.8 h left.
 
 ## How we work (agreed)
 - The user (junior Python dev, new to ML/audio) wants to understand every decision; explain simply.
@@ -32,106 +32,74 @@ PyAudioWPatch 0.2.12.9, soxr 1.1.0,
 silero-vad 6.2.3, torch 2.14.1+cpu, transformers. Models in `models/`: faster-whisper small,
 medium, large-v3; NLLB converted to `models/nllb-200-distilled-600M-ct2-int8`.
 
-## Done (M0 complete)
-- Project docs: PLAN.md, DECISIONS.md, TESTS.md, CLAUDE.md, chats/INDEX.md, .gitignore, requirements.txt
-- `scripts/gpu_smoke_test.py`: registers NVIDIA DLL folders from the venv, checks GPU + compute types,
-  runs Whisper tiny on the GPU with `int8_float32` — PASSED.
-- Git (local only, branch `main`): `dcdb5a8` (docs), `be69054` (smoke test + decisions), `f8dca82` (handover),
-  then the M1 commit. No GitHub remote yet.
+## Where we are
+- M0 setup ✅ · M1 audio capture ✅ · M2 live skeleton ✅ · M3 ASR settings ✅ · M4 translation ✅ ·
+  system audio + much of M6 latency work ✅ · **M5 speaker identification ☐ (next)** · README ☐ · rehearsal ☐
+- Live program: `.\.venv\Scripts\python.exe -m hylive [--list-devices] [--mic N] [--system N] [--sources mic|system|mic,system]
+  [--asr-model large-v3] [--min-silence-ms 500] [--max-segment-s 5]`. Mic = 9, loopback = 10 on this laptop.
+- Pipeline (D-017/D-021): capture (PortAudio callback, 10 ms blocks) → per source: 16 kHz mono (soxr) + Silero VAD
+  segmenter (own model per source) → shared ASR thread (Whisper large-v3, GPU, int8_float32, beam 1, temp 0,
+  128-token cap, repetition guard) → translation thread (NLLB-200 600M, CPU int8) → terminal.
+  Keep-alive silence on the speakers while capturing loopback (D-019).
+- Output per block: `[hh:mm:ss] Me|Speaker ?`, HY, EN, `latency X s (ASR, translation, queue A+B)`.
+  Exit summary per source: detected / printed / discarded, PortAudio flags, latency median / max / % ≤ 5 s.
+- Key numbers: eval CER 8.6 % (10 sentences, laptop mic); live loopback = offline accuracy (Test A 5.7 % = 5.7 %);
+  one side talking: latency median 2.8 s, 100 % ≤ 5 s; overlap + echo: 64–70 % ≤ 5 s, max 8.7 s.
 
-## Done (M1 complete)
-- `hylive/audio_capture.py`: `DeviceInfo`, `AudioChunk(source, data, captured_at)`, `get_device`,
-  `default_mic`, `default_loopback`, `DeviceCapture` (PortAudio callback → queue; native format 48 kHz,
-  2 ch, int16; 10 ms blocks; counts PortAudio status flags).
-- `scripts/list_devices.py` (WASAPI devices only) and `scripts/record_test.py` (records both devices at
-  once to `recordings/`, prints audio received, first-block delay, largest gap, peak level, problem flags).
-- Devices on this laptop: mic = 9, loopback = 10 (unchanged with headphones plugged in).
-- `record_test.py --label <name>` puts the label in the file names.
+## Code map
+- `hylive/audio_capture.py` — DeviceInfo, AudioChunk, get_device, default_mic, default_loopback, recordable_devices,
+  DeviceCapture, output_device_for_loopback, SilentOutput
+- `hylive/audio_convert.py` — to_float32_frames, to_mono, Resampler (soxr)
+- `hylive/segmenter.py` — Segment, load_vad_model, Segmenter (process, flush)
+- `hylive/asr.py` — Transcriber (transcribe, transcribe_full → AsrResult), MAX_NEW_TOKENS, MAX_COMPRESSION_RATIO
+- `hylive/translate.py` — Translator (NLLB via CTranslate2)
+- `hylive/gpu.py` — register_nvidia_dlls (must run before importing ctranslate2/faster_whisper)
+- `hylive/__main__.py` — CLI, threads, output, summary
+- `scripts/` — list_devices, record_test (--label, --keep-alive), convert_test, vad_test, asr_test, mt_test,
+  record_eval, eval_asr (--model, --beam-size, --prompt, --pad-ms, --translate), play_eval (--ids, --gap), gpu_smoke_test
+- `eval/sentences.txt` (committed), `eval/audio/` (git-ignored)
 
-## Done (M2 sub-step 1)
-- `hylive/audio_convert.py`: `to_float32_frames`, `to_mono`, `Resampler` (soxr `ResampleStream`, 48 kHz → 16 kHz).
-- `scripts/convert_test.py <wav>`: converts in 10 ms blocks, writes `<name>_16k.wav`, prints levels per
-  channel, mono mix and channel correlation (correlation tells which mic was active: ~+0.75 laptop, ~+1.00 headset).
-- Verified: durations preserved, clean sound, no cancellation (D-013).
-- Finding: with the 3-ring headphones plugged in, the weak headset cable mic replaces the laptop mic
-  (peak ~0.01 vs 0.137) → D-012 corrected: laptop mic + headphones without a mic.
+## NEXT: M5 speaker identification (~3.5 h budget) — explain first, wait for approval
+Requirement: system side → `Speaker 1`, `Speaker 2`, …; same person keeps the same label for the session; mic = `Me`.
+Plan to propose (verify every library fact first):
+1. Speaker embeddings ("voice fingerprints") on the CPU, e.g. SpeechBrain ECAPA-TDNN (`speechbrain/spkrec-ecapa-voxceleb`);
+   check install size, licence, Windows + torch 2.14 CPU compatibility, model download location (models/, D-004).
+2. Online clustering: compare each new system-side phrase with the known speakers (cosine similarity); above a
+   threshold → same speaker (update its average embedding); otherwise → new `Speaker N`. Short phrases (< ~1 s) are
+   unreliable → decide how to label them (e.g. keep the previous speaker, shown honestly).
+3. Where it runs: in the pipeline for system phrases only, without hurting latency (CPU, parallel to the GPU ASR).
+4. Test offline first with a 2-voice recording (`record_test.py --keep-alive --label ...` of an interview video,
+   `--sources system`), measure label errors; tune the threshold by numbers; then live.
+5. Real test with 2 helpers in a call (needs mic-less headphones / adapter).
 
-## Done (M2 sub-step 2)
-- `hylive/segmenter.py`: `Segment(source, audio, start_s, end_s, ended_at)`, `load_vad_model()`,
-  `Segmenter.process(samples)` / `flush()` (VADIterator on 512-sample windows, 0.3 s pre-roll,
-  max segment 10 s, min silence 500 ms, padding 100 ms).
-- `scripts/vad_test.py <wav> [--threshold] [--min-silence-ms] [--max-segment-s]`: feeds a recording in 10 ms
-  blocks, prints phrases + "detected after", saves `recordings/segments/<name>/segNN.wav`.
-- Verified on laptop_mic and headset_mic: correct phrases, not clipped, end detected ~0.47 s after speech, ~3 % CPU.
+## OPEN ISSUES before submission (priority order)
+1. **Echo / headset mic (D-012, HIGH):** get mic-less headphones (2-ring plug) or a TRRS→TRS adapter; then re-run
+   the real-world test (both streams) and re-measure latency and "Me" labelling.
+2. **M5 speaker identification** not implemented (system side shows "Speaker ?").
+3. **Latency under overlapping speech (C-1):** 64–70 % ≤ 5 s with echo. Re-test echo-free; if still needed, consider
+   batching queued phrases on the GPU (faster-whisper batched mode) — verify first.
+4. **ASR accuracy limits (README):** word-initial Բ → Վ/dropped; single-letter errors flip the English meaning.
+   Optional if time: beam 5 with the shorter 5 s phrases (measure latency); community Armenian fine-tune.
+5. **Cosmetic:** "�" at the end of phrases cut mid-word (strip U+FFFD or similar); "(cut at token limit)" flag
+   never appeared although one output looked truncated ("այդ հ") — check the approximate token count logic;
+   torch.jit / Hugging Face symlink + token warnings at start-up (document or silence via env vars).
+6. **Local-only check (C-2):** run with Wi-Fi off after all downloads; Hugging Face may try the network for the
+   tokenizer/models → test, possibly set `HF_HUB_OFFLINE=1`.
+7. **README** (setup incl. audio devices, keep-alive, models + alternatives + reasons with numbers, architecture,
+   limitations, improvements) — not started. PLAN.md milestone table is outdated (update or point to HANDOVER).
+8. **Fresh-setup check:** follow the README from scratch (new venv, `requirements.txt`, NLLB conversion with HF_HOME on D:).
+9. **Chats (deliverable):** test the export (Settings → Privacy → Export data) NOW; final export after the last
+   message; one .md per session in `chats/`, unedited; update `chats/INDEX.md` (so far 1 session).
+10. **Repo + Mathrix:** create the GitHub repo (private first, D-006); ask Mathrix: public vs. collaborator access,
+    and which calling app the interview uses (D-007).
+11. **Helpers:** 2 people for a test call (M5 test and final rehearsal); record one 2-voice call for offline tuning.
+12. Optional: Test B with eval clips + reading (clips as call side, known text for both sides).
 
-## Done (M2 complete)
-- `hylive/gpu.py` (`register_nvidia_dlls`), `hylive/asr.py` (`Transcriber`: large-v3 default, beam 1, temperature 0,
-  language hy, no internal VAD, no previous-text conditioning, warm-up), `hylive/translate.py` (`Translator`: NLLB
-  CTranslate2 int8 CPU, hye_Armn → eng_Latn).
-- `hylive/__main__.py`: `python -m hylive [--list-devices] [--mic N] [--asr-model] [--min-silence-ms] [--max-segment-s]`;
-  two threads (D-017); prints `[hh:mm:ss] Me`, HY, EN, latency (ASR, translation, queue); exit summary
-  "phrases detected / printed" + PortAudio problem flags.
-- Test scripts: `scripts/asr_test.py <wav> [--model] [--beam-size]`, `scripts/mt_test.py [--device]`.
-- Live results: latency 3.0–3.6 s per sentence, 4.8 s for two merged sentences; ASR is the weakest link.
-
-## Tests passed (TESTS.md)
-ENV-1 GPU/driver · ENV-2 Python 3.12 · ENV-3 Armenian in terminal · ENV-4 GPU runs int8_float32 ·
-R1-1 to R1-4 (device list, flags, simultaneous capture, user still hears audio). Mic level reference
-values and one open issue (unexplained silent mic recordings) are in TESTS.md.
-
-## Key decisions (details in DECISIONS.md)
-- D-001 System audio via Windows WASAPI loopback (VB-Cable only as fallback).
-- D-002 GPU models via CTranslate2; PyTorch CPU-only (current PyTorch GPU builds dropped Pascal). Verified.
-- D-004 venv + model cache on D: inside the project (`models/`, git-ignored).
-- D-005 Do not update the NVIDIA driver.
-- D-006 GitHub repo private first; ask Mathrix public vs. collaborator access. (Pending)
-- D-007 Test calls: Google Meet in Chrome, Zoom backup, wired headphones. (Provisional; ask Mathrix which app the interview uses)
-- D-008 cuBLAS/cuDNN from pip in the venv, DLL folders registered at start-up. Verified.
-- D-009 Whisper temperature fallback multiplied latency (4.01 s vs 0.67 s on a synthetic tone; with no
-  retries it hallucinated "A-A-A-…"). Plan: `temperature=0.0` + VAD, decide after real-speech tests. (Pending)
-- D-010 WASAPI loopback sends NO data while nothing plays → segmenter must not wait for silence samples. (Pending, M2)
-- D-011 PyAudioWPatch for capture, WASAPI only. Verified.
-- D-012 Laptop mic + headphones WITHOUT a mic (headset cable mic too weak/variable; corrected). (Provisional, hardware pending)
-- D-013 soxr 1.1.0 streaming resampler, channels averaged to mono. Verified.
-- D-014 silero-vad 6.2.3 VADIterator + own segmenter (0.5 / 500 ms / 10 s / 100 ms pad). Verified.
-- D-015 Whisper large-v3 ASR baseline (CER 21 % vs medium 37 %, small 43 %; ~1.8 s/phrase). Provisional until M3.
-- D-016 NLLB-200 600M, CTranslate2 int8 on CPU (~0.5 s). Non-commercial license. Verified.
-- D-017 Two threads + Event-based shutdown (fixed lost phrases on Ctrl+C). Verified.
-- D-018 M3: beam 1, no prompt, 100 ms padding (CER 8.6 %, max 1.89 s). Բ→Վ is a Whisper limitation.
-- Lesson: request `int8_float32` explicitly — CTranslate2 silently falls back to float32 if float16 is requested on this GPU.
-
-## Open items for the user
-- Ask Mathrix: public repo or collaborator access? Which calling app in the interview?
-- Confirm two helpers for live speaker tests (needed around M5 and M7).
-- Headphone setup: mic-less headphones (2-ring), TRRS→TRS adapter, or check whether Realtek Audio Console
-  exists. The user prefers NOT to change Windows settings for now.
-- Test the chat export (Settings → Privacy → Export data): is this session included, in what format?
-- Export session 01 to `chats/` and record it in `chats/INDEX.md` (final export at the very end).
-
-## Remaining milestones (PLAN.md)
-M1 audio capture (2 h) → M2 walking skeleton, mic only (2.5 h) → M3 eval set + ASR comparison (3.5 h)
-→ M4 translation comparison (1.5 h) → M5 both streams + speaker ID (3.5 h) → M6 latency/reliability (2 h)
-→ M7 README + rehearsal (2 h) · buffer 1.5 h.
-
-## Plan to Oct 31 (≈13 h left)
+## Remaining time plan (≈ 10.8 h)
 | When | Work | h |
 |---|---|---|
-| next | M3: Armenian ASR accuracy (capped 1.5 h) | 1.5 |
-| Oct 26–27 | system stream in the live program + D-010 (no loopback data in silence); max segment ≈5–6 s | 1.5 |
-| Oct 28–29 | M5 speaker labels (needs 2 helpers + mic-less headphones / adapter) | 3.5 |
-| Oct 30 | M6 latency/reliability + README | 3 |
-| Oct 31 | rehearsal, chat export, submit | 2 |
-
-## Done (M3 complete, 2026-10-25)
-- Eval set recorded (`eval/audio/`, git-ignored); `scripts/record_eval.py`, `scripts/eval_asr.py [--beam-size] [--prompt] [--pad-ms]`.
-- Chosen: large-v3, beam 1, no prompt, 100 ms padding — CER 8.6 %, ASR max 1.89 s (D-018). Live default unchanged.
-
-## Done (M4 complete, 2026-10-25)
-- `eval_asr.py --translate`: NLLB 10/10 understandable on correct Armenian; from ASR text 2 correct / 3 gist / 5 wrong.
-  Translator kept; ASR is the limit (TESTS.md M4). Revisit ASR (e.g. beam 5 + shorter max segment) only if time remains.
-
-## Next step
-1. System audio in the live program: `--system N` (default: loopback of default speakers), a second capture +
-   segmentation thread labelled per stream, shared processing thread; handle D-010 (no loopback data during silence).
-   First tests with an Armenian YouTube video in headphones. Explain design first, wait for approval.
-2. M5 speaker labels (needs 2 helpers + mic-less headphones / adapter).
+| Oct 26–27 | M5 speaker identification (offline tests → live) | 3.5 |
+| Oct 27–28 | hardware fix + echo-free real-world test; latency fixes if needed | 1.5 |
+| Oct 29–30 | README, cosmetic fixes, local-only + fresh-setup checks | 3 |
+| Oct 30–31 | rehearsal call with 2 helpers, chat export, repo, submit | 2 |
+| | buffer | ~0.8 |

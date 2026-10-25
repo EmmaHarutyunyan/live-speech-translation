@@ -13,5 +13,6 @@ Hours are active working time as estimated by the user, not wall-clock time.
 | 2026-10-25 | 03:56 | 04:05 | ~0.15 | M3 | Evaluation set (10 sentences) + record/eval scripts written, not yet run |
 | 2026-10-25 | 16:38 | 17:00 | ~0.35 | M3 | Recorded eval set, 4 ASR settings compared, Բ hypothesis tested; M3 closed |
 | 2026-10-25 | 17:00 | 17:10 | ~0.15 | M4 | Translation judged on the eval set (`--translate`); NLLB kept, opus-mt not needed |
+| 2026-10-25 | 17:07 | 18:50 | ~1.7 | M6 (early) | System audio: keep-alive, two streams, phrase bounds, translation thread, turbo test, Test A, real-world test, docs |
 
-**Total so far:** ~7.5 h of ~20 h
+**Total so far:** ~9.2 h of ~20 h (≈ 10.8 h left; deadline Nov 1 23:59, target Oct 31)

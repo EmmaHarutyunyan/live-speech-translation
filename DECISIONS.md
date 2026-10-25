@@ -86,7 +86,9 @@ Each entry: what was decided, why, what else was considered, status. Newest at t
   only with the user's explicit OK; the user prefers not to change Windows settings for now).
   Verification: correlation ~+0.75 while headphones are plugged in.
 - **Rejected:** headset cable mic (too weak/variable); Windows "Microphone Boost" (amplifies noise too; system setting).
-- **Status:** Provisional — waiting for the hardware choice.
+- **Evidence 2026-10-25:** with the headset mic, the video/call audio leaks from the earbuds into the mic: ~5 of 11
+  "Me" blocks in the real-world run were echo of the call side, adding ~25 % load and wrong "Me" labels.
+- **Status:** Provisional — hardware still needed (mic-less headphones or TRRS→TRS adapter). HIGH PRIORITY before the interview.
 
 ## D-013 — soxr streaming resampler for 48 kHz → 16 kHz (2026-10-23)
 - **Decision:** Average channels to mono, then resample with `soxr.ResampleStream` (soxr 1.1.0, quality "HQ")
@@ -164,3 +166,36 @@ Each entry: what was decided, why, what else was considered, status. Newest at t
 - **Kept in code:** `eval_asr.py --pad-ms` and a pre-roll of at least padding + 0.2 s in the segmenter (no effect at 100 ms).
 - **Not done (time cap):** community Armenian fine-tuned Whisper models — a possible improvement listed for the README.
 - **Status:** Decided 2026-10-25. M3 closed (~0.5 h of the 1.5 h cap).
+
+## D-019 — Silent keep-alive stream for WASAPI loopback (solves D-010) (2026-10-25)
+- **Decision:** While capturing system audio, play digital silence (all zeros) on the speakers that the loopback device
+  records (`SilentOutput` in `hylive/audio_capture.py`; speaker found by name = loopback name without " [Loopback]").
+- **Why:** Loopback sends no data while nothing plays (D-010) → phrase ends would not be detected and timestamps/latency
+  would drift. With the keep-alive, loopback delivers continuous blocks (10.0 s in 1001 blocks during silence).
+- **Alternative (not needed):** clock-based phrase end + inserting silence for gaps (more complex).
+- **Status:** Verified 2026-10-25 (TESTS.md).
+
+## D-020 — Bound the work per phrase (2026-10-25)
+- **Decision:** (F1) Whisper `max_new_tokens=128`, flagged "(cut at token limit)"; (F2) if Whisper's compression ratio
+  > 2.4 (Whisper's own threshold) the block is shown as "(repetitive output discarded …)" and not translated;
+  (F3) NLLB `max_decoding_length = 2 × input tokens + 10`; (F4) default max phrase length 5 s (was 10 s);
+  (F5) `--sources` testing aid to run one side only.
+- **Why:** Long phrases (10 s) gave 5.8–8.4 s latency; repetition loops took 7–8 s ASR + 17–20 s translation and
+  caused a queue cascade (90 s latency). Guards are visible in the output, not silent.
+- **Verified:** eval CER unchanged (8.6 %); system-only YouTube 85 % ≤ 5 s; loops discarded instead of blocking.
+- **Not changed:** decoding (temperature 0, beam 1). `no_repeat_ngram_size` / `repetition_penalty` would need an eval run.
+- **Status:** Verified 2026-10-25.
+
+## D-021 — Separate translation thread (2026-10-25)
+- **Decision:** phrase queue → ASR thread (GPU) → text queue → translation thread (CPU, the only printer).
+- **Why:** the GPU sat idle during translation; now it transcribes the next phrase while the CPU translates the previous
+  one. Latency per phrase unchanged; waiting time reduced. Shutdown: STOP passes ASR → translation thread after all
+  sources stopped; the translation thread sets "done" (D-017 still applies).
+- **Verified:** text queue stayed at 0 in the real-world run; max queue 4 (was 9+ and growing), recovered to 0.
+- **Status:** Verified 2026-10-25. Remaining bottleneck: ASR on the GPU.
+
+## D-022 — large-v3-turbo rejected (2026-10-25)
+- **Rule (set before measuring):** adopt if CER ≤ 10.6 % (≤ 2 points worse than 8.6 %) and clearly faster.
+- **Result:** ASR avg 0.93 s (vs 1.70 s) but CER 23.0 %; sentence 02 even came out in Latin/Cyrillic letters despite
+  `language="hy"`. → keep large-v3.
+- **Status:** Decided 2026-10-25.

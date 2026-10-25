@@ -103,3 +103,50 @@ def recordable_devices(p: pyaudio.PyAudio) -> list[DeviceInfo]:
         if info["hostApi"] == wasapi_index and info["maxInputChannels"] > 0:
             devices.append(_to_device_info(info))
     return devices
+
+
+def output_device_for_loopback(p: pyaudio.PyAudio, loopback: DeviceInfo) -> dict:
+    """Find the speaker (output) device that a loopback device records from: same name without ' [Loopback]'."""
+    suffix = " [Loopback]"
+    if not loopback.name.endswith(suffix):
+        raise ValueError(f"Device {loopback.index} ({loopback.name}) is not a loopback device.")
+    name = loopback.name[: -len(suffix)]
+    wasapi_index = p.get_host_api_info_by_type(pyaudio.paWASAPI)["index"]
+    for i in range(p.get_device_count()):
+        info = p.get_device_info_by_index(i)
+        if (info["hostApi"] == wasapi_index and info["maxOutputChannels"] > 0
+                and not info["isLoopbackDevice"] and info["name"] == name):
+            return info
+    raise ValueError(f"No WASAPI output device named {name!r} found for loopback device {loopback.index}.")
+
+
+class SilentOutput:
+    """Plays digital silence (all zeros, inaudible) on the speakers that the loopback device records.
+
+    WASAPI loopback delivers no data at all while nothing is playing (DECISIONS.md D-010). Keeping an
+    output stream open makes Windows process the speakers continuously, so loopback keeps delivering blocks.
+    """
+
+    def __init__(self, p: pyaudio.PyAudio, loopback: DeviceInfo):
+        self.p = p
+        self.info = output_device_for_loopback(p, loopback)
+        self._channels = self.info["maxOutputChannels"]
+        self.stream = None
+
+    def _callback(self, in_data, frame_count, time_info, status):
+        return (bytes(frame_count * self._channels * SAMPLE_WIDTH_BYTES), pyaudio.paContinue)
+
+    def start(self) -> None:
+        self.stream = self.p.open(
+            format=SAMPLE_FORMAT,
+            channels=self._channels,
+            rate=int(self.info["defaultSampleRate"]),
+            output=True,
+            output_device_index=self.info["index"],
+            frames_per_buffer=FRAMES_PER_BUFFER,
+            stream_callback=self._callback,
+        )
+
+    def stop(self) -> None:
+        self.stream.stop_stream()
+        self.stream.close()

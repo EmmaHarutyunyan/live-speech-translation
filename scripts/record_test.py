@@ -23,7 +23,7 @@ PROJECT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_DIR))  # so "import hylive" works when running this script
 
 from hylive.audio_capture import (  # noqa: E402
-    SAMPLE_WIDTH_BYTES, DeviceCapture, default_loopback, default_mic, get_device,
+    SAMPLE_WIDTH_BYTES, DeviceCapture, SilentOutput, default_loopback, default_mic, get_device,
 )
 
 
@@ -32,6 +32,8 @@ def main() -> None:
     parser.add_argument("--mic", type=int, help="microphone device index (see scripts/list_devices.py)")
     parser.add_argument("--system", type=int, help="loopback device index (see scripts/list_devices.py)")
     parser.add_argument("--seconds", type=float, default=15.0)
+    parser.add_argument("--keep-alive", action="store_true",
+                        help="play inaudible silence on the speakers so loopback keeps delivering data (D-010)")
     parser.add_argument("--label", help="added to the file names, e.g. laptop -> <time>_laptop_mic.wav")
     args = parser.parse_args()
     if args.label is not None and not re.fullmatch(r"[A-Za-z0-9_-]+", args.label):
@@ -54,6 +56,11 @@ def main() -> None:
         chunks: queue.Queue = queue.Queue()
         captures = [DeviceCapture(p, mic, "mic", chunks), DeviceCapture(p, system, "system", chunks)]
 
+        keep_alive = SilentOutput(p, system) if args.keep_alive else None
+        if keep_alive:
+            print(f"keep-alive: playing silence on [{keep_alive.info['index']}] {keep_alive.info['name']}")
+            keep_alive.start()
+
         print(f"\nRecording {args.seconds:.0f} s ...")
         started = time.monotonic()
         for c in captures:
@@ -61,6 +68,8 @@ def main() -> None:
         time.sleep(args.seconds)
         for c in captures:
             c.stop()
+        if keep_alive:
+            keep_alive.stop()
         wall_seconds = time.monotonic() - started
 
         # Sort the received blocks by source.

@@ -36,6 +36,9 @@ class Translator:
         if not text.strip():
             return ""
         source = self.tokenizer.convert_ids_to_tokens(self.tokenizer.encode(text))
-        results = self.translator.translate_batch([source], target_prefix=[[TARGET_LANG]], beam_size=self.beam_size)
+        results = self.translator.translate_batch(
+            [source], target_prefix=[[TARGET_LANG]], beam_size=self.beam_size,
+            max_decoding_length=2 * len(source) + 10,  # output roughly proportional to input (D-020)
+        )
         target = results[0].hypotheses[0][1:]  # first token is the target language code
         return self.tokenizer.decode(self.tokenizer.convert_tokens_to_ids(target), skip_special_tokens=True)

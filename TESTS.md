@@ -71,7 +71,8 @@ Settings: threshold 0.5, min silence 500 ms, max segment 10 s, speech padding 10
 - ✅ R3-2 Every transcribed segment gets an English line (live program and `eval_asr.py --translate`)
 
 ## R4 — Speaker identification
-- ☐ R4-1 Everything from the mic is labelled `Me`
+- ⚠️ R4-1 Everything from the mic is labelled `Me` — works, BUT with the headset mic the video/call leaks into the
+  mic (echo) and ~5 of 11 "Me" blocks were echo of the call side (2026-10-25). Fix: hardware (D-012).
 - ☐ R4-2 Two different remote voices get different labels (`Speaker 1`, `Speaker 2`)
 - ☐ R4-3 Labels stay the same for the same person over a 10+ minute session (count wrong labels)
 
@@ -80,7 +81,8 @@ Settings: threshold 0.5, min silence 500 ms, max segment 10 s, speech padding 10
 - ✅ R5-2 Segments appear while the conversation is still running (mic side, 2026-10-25)
 
 ## Constraints
-- ☐ C-1 Latency: logged per segment as (end of phrase → English line printed); report median, worst case, % under 5 s
+- ⚠️ C-1 Latency: logged per segment; exit summary prints median, max and % ≤ 5 s per source (2026-10-25).
+  One side at a time: 100 % ≤ 5 s (median 2.8 s). Both sides overlapping + echo: 64–70 % ≤ 5 s, max 8.7 s. NOT yet met.
 - ☐ C-2 Local only: full run works with Wi-Fi off after models are downloaded
 - ☐ C-3 Repo contains no model weights, audio recordings or keys (`git ls-files` check)
 
@@ -149,3 +151,36 @@ Judged "understandable?" (the brief's wording) by the user and Claude.
 - Translation time 0.38–0.53 s per sentence.
 - KNOWN LIMITATION: the translator is good, but single-letter ASR errors often flip the meaning (coffee → seriously,
   doctor → singer). Improving the English means improving the Armenian ASR, not the translator.
+
+## System audio + latency/reliability (2026-10-25)
+### Keep-alive for loopback (D-019) — `record_test.py --keep-alive`
+| Test | System stream | Verdict |
+|---|---|---|
+| A: no keep-alive, nothing playing | 0.0 s in 0 blocks | problem reproduced |
+| B: keep-alive, nothing playing | 10.0 s in 1001 blocks, gap 0.016 s, peak 0.000 | ✅ continuous silence |
+| C: keep-alive + video | 15.0 s in 1503 blocks, peak 0.099; video sounded normal | ✅ |
+
+### Live runs, in order (YouTube = Armenian YouTube video in headphones)
+| Run | Settings | Phrases (mic/system) | Latency | Queue | Notes |
+|---|---|---|---|---|---|
+| 1 YouTube, system only (user silent) | max segment 10 s | 1 / 8 | 3.1–8.4 s, most > 5 s | 0–1 | long continuous phrases → long ASR + translation; 1 "Me" block was ECHO |
+| 2 YouTube, both + user speech | max 10 s | many / many | up to 90 s | up to 27 | Whisper repetition loops («այդ այդ այդ…», 7–8 s ASR + 17–20 s translation) → queue cascade |
+| — eval rerun after F1 (128-token cap) | | | | | CER 8.6 % unchanged ✅ |
+| 3 YouTube, system only | F1–F5 (max 5 s, caps, guard) | – / 13 | 3.3–5.4 s, 11/13 ≤ 5 s (85 %) | 0–2 | 13/13 printed; "�" at the end of phrases cut mid-word |
+| 4 YouTube, both + user speech | F1–F5 | 13 / 11 | up to 22 s | up to 9 | throughput: ~60 s of work for ~50 s of audio; 1 loop discarded by the guard ✅ |
+| — `large-v3-turbo` on eval set | | | ASR avg 0.93 s (1.8x faster) | | CER 23.0 % (vs 8.6 %) → rejected (D-022) |
+| 5 Test A: eval clips 01–06 played as call side | + translation thread (D-021) | – / 6 | **2.4–3.2 s, median 2.8 s, 6/6 ≤ 5 s** | 0+0 | **live CER 5.7 % = file-based CER 5.7 %** on the same clips |
+| 6 Real-world: interview video + user reading 06–10 (~47 s) | same | 11 / 10 | mic median 4.8 s, max 8.7 s, 7/11 ≤ 5 s (64 %); system median 4.1 s, max 7.3 s, 7/10 (70 %) | max 4+0, recovered to 0 | ~5 of 11 "Me" blocks = ECHO of the video; 0–20 s (overlap + echo) 5–8.7 s, from 24 s 2.4–4.3 s |
+All runs: detected = printed for both sources, 0 PortAudio problem flags.
+
+### Accuracy in the real-world run (6)
+- User's sentences 06–10 over the video, headset mic: **CER 12.4 %** (file-based eval, laptop mic, same 5 sentences: 11.9 %).
+- English of the user's 5 sentences: ~0 correct, 2 gist, 3 wrong (e.g. «անդրև» → rain lost; "next week" → "a desert").
+- English of the 10 video blocks (Claude's impression; user's judgement pending): a few carry the meaning
+  ("if there were no family"), most do not.
+- Test A English (clips 01–06): 3 correct, 1 gist, 2 wrong (same pattern as M4).
+
+### Conclusions
+- The live path loses no accuracy vs. offline (Test A). ASR is the accuracy limit; ASR on the GPU is the throughput limit.
+- One side talking at a time: comfortably < 5 s. Overlapping speech + echo saturates the GPU (~0.45 phrases/s × ~2 s).
+- Echo (headset mic hears the headphones) causes ~25 % of the load and all wrongly labelled "Me" blocks.
