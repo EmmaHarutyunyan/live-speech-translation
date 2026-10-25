@@ -7,6 +7,7 @@ CER = character error rate after normalisation (lower case, no punctuation, "ե�
 Run from the project folder, e.g.:
     .\\.venv\\Scripts\\python.exe scripts\\eval_asr.py --beam-size 1
     .\\.venv\\Scripts\\python.exe scripts\\eval_asr.py --beam-size 5 --prompt
+    .\\.venv\\Scripts\\python.exe scripts\\eval_asr.py --translate   (also English for reference and ASR text)
 """
 
 import argparse
@@ -47,11 +48,11 @@ def edit_distance(a, b) -> int:
     return previous[-1]
 
 
-def phrases_from_wav(path: Path, vad_model) -> list:
+def phrases_from_wav(path: Path, vad_model, pad_ms: int) -> list:
     with wave.open(str(path), "rb") as wav:
         channels, rate = wav.getnchannels(), wav.getframerate()
         frames = to_float32_frames(wav.readframes(wav.getnframes()), channels)
-    segmenter = Segmenter("mic", vad_model)
+    segmenter = Segmenter("mic", vad_model, speech_pad_ms=pad_ms)
     resampler = Resampler(rate)
     block = int(rate * BLOCK_SECONDS)
     starts = range(0, len(frames), block)
@@ -67,6 +68,8 @@ def main() -> None:
     parser.add_argument("--model", default="large-v3")
     parser.add_argument("--beam-size", type=int, default=1)
     parser.add_argument("--prompt", action="store_true", help=f"use initial_prompt: {PROMPT}")
+    parser.add_argument("--pad-ms", type=int, default=100, help="VAD speech padding before/after each phrase")
+    parser.add_argument("--translate", action="store_true", help="also translate reference and ASR text with NLLB (M4)")
     args = parser.parse_args()
 
     sentences = [line.split("\t", 1) for line in SENTENCES_FILE.read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -77,13 +80,19 @@ def main() -> None:
     vad_model = load_vad_model()
     transcriber = Transcriber(args.model, beam_size=args.beam_size, initial_prompt=PROMPT if args.prompt else None)
     transcriber.warm_up()
-    setting = f"model {args.model}, beam {args.beam_size}, prompt {'on' if args.prompt else 'off'}"
+    translator = None
+    if args.translate:
+        from hylive.translate import Translator  # only loaded when needed
+        translator = Translator()
+        translator.translate("Բարև")  # warm-up
+    setting = (f"model {args.model}, beam {args.beam_size}, prompt {'on' if args.prompt else 'off'}, "
+               f"pad {args.pad_ms} ms")
     print(f"\nSetting: {setting}\n")
 
     total_edits = total_chars = 0
     times = []
     for sid, reference in sentences:
-        segments = phrases_from_wav(AUDIO_DIR / f"eval{sid}.wav", vad_model)
+        segments = phrases_from_wav(AUDIO_DIR / f"eval{sid}.wav", vad_model, args.pad_ms)
         t0 = time.perf_counter()
         hypothesis = " ".join(transcriber.transcribe(s.audio) for s in segments).strip()
         times.append(time.perf_counter() - t0)
@@ -94,6 +103,12 @@ def main() -> None:
         print(f"[{sid}] CER {100 * edits / len(ref):5.1f} %  {times[-1]:.2f} s  {len(segments)} phrase(s)")
         print(f"     ref: {reference}")
         print(f"     hyp: {hypothesis or '(nothing recognised)'}")
+        if translator is not None:
+            t0 = time.perf_counter()
+            en_hyp = translator.translate(hypothesis)
+            mt_time = time.perf_counter() - t0
+            print(f"     EN (reference): {translator.translate(reference)}")
+            print(f"     EN (ASR):       {en_hyp}   [{mt_time:.2f} s]")
 
     print(f"\nRESULT ({setting}): CER {100 * total_edits / total_chars:.1f} % over {len(sentences)} sentences, "
           f"ASR time avg {sum(times) / len(times):.2f} s, max {max(times):.2f} s")

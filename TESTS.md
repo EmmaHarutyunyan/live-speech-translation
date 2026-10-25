@@ -62,8 +62,9 @@ Settings: threshold 0.5, min silence 500 ms, max segment 10 s, speech padding 10
 - Note: VAD also detects the very quiet headset speech — this does NOT mean ASR will understand it (D-012 stands).
 
 ## R2 — Armenian transcription
-- ☐ R2-1 Evaluation set exists (short Armenian clips + correct text; audio kept local, not committed)
-- ☐ R2-2 CER/WER measured for each candidate model; results recorded in DECISIONS.md
+- ✅ R2-1 Evaluation set exists: `eval/sentences.txt` (10 sentences, committed) + `eval/audio/evalNN.wav`
+  (laptop mic, peaks 0.105–0.293, git-ignored) (2026-10-25)
+- ✅ R2-2 CER measured per setting with `scripts/eval_asr.py`; results below and in DECISIONS.md D-015/D-018
 
 ## R3 — English translation
 - ☐ R3-1 Fixed Armenian sentence list with reference English; each candidate model judged "understandable" or not
@@ -114,3 +115,18 @@ Settings: threshold 0.5, min silence 500 ms, max segment 10 s, speech padding 10
   - ✅ Test 1: 3 sentences, wait, Ctrl+C → detected 3, printed 3, summary printed last.
   - ✅ Test 2: Ctrl+C while still speaking → phrase rescued by `flush()`: detected 1 (1 at shutdown), printed 1.
 - ✅ 0 PortAudio problem flags in all runs.
+
+## M3 — Armenian ASR accuracy on the evaluation set (2026-10-25, `scripts/eval_asr.py`, live path incl. VAD)
+Decision rule set in advance: lowest CER with max ASR time ≤ ~2.5 s; gains < ~2 CER points → keep the simpler/faster setting.
+| Setting (large-v3, int8_float32, temperature 0) | CER | ASR avg | ASR max | Verdict |
+|---|---|---|---|---|
+| **beam 1, no prompt, pad 100 ms (baseline)** | **8.6 %** | 1.67 s | **1.89 s** | ✅ chosen |
+| beam 5 | 6.4 % | 2.80 s | 3.73 s | ❌ too slow (latency would reach ~5 s); gain mostly from one sentence (07) |
+| beam 5 + Armenian initial prompt | 12.8 % | 2.50 s | 3.85 s | ❌ worse: prompt caused a hallucination on 07 («3-3 անձր է վերկալիս») |
+| beam 1, pad 300 ms | 7.7 % | 1.67 s | 1.87 s | ❌ only 0.9 points better, mixed per sentence, Բ errors unchanged |
+- Perfect or near-perfect: 03 (0 %), 05, 10 (< 3 %). Hardest: 01, 07, 08 (~21 %).
+- KNOWN LIMITATION: word-initial Բ is recognised as Վ or dropped in 3 of 4 cases (Վարև, Ոլորը, Վաժիշկը) in every
+  setting. The pad-300 test rules out VAD clipping as the cause → it comes from Whisper itself on this voice/mic.
+  Other recurring errors: ճ→ջ (սուրջ), dropped հ (շնորակալություն), split words (երեկ ոյան).
+- Note: 8.6 % CER on read sentences is much better than the 21 % on the earlier spontaneous test recording —
+  clear speech helps a lot (relevant for the interview).

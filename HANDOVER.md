@@ -1,4 +1,4 @@
-# HANDOVER — M2 complete; next: M3 (Armenian ASR accuracy)
+# HANDOVER — M3 complete; next: translation check (M4) and system audio
 
 Written 2026-10-21 at the end of M0; updated 2026-10-23 after M1 and M2 sub-step 1; 2026-10-25 after M2 (complete). Both were done in the same Cowork
 session (session 01); `chats/INDEX.md` needs updating accordingly.
@@ -9,7 +9,7 @@ New session: read this file, then `CLAUDE.md` (project rules). Look up details i
 Python terminal program: capture microphone + system audio at the same time, transcribe spoken Armenian,
 translate to English, print each segment with time, speaker (`Me` / `Speaker 1`, `Speaker 2`, … stable for
 the session), Armenian original and English translation — at most 5 s after the end of a phrase.
-All models local. Deadline: 2026-11-01 23:59 Yerevan time. Budget ~20 h; ~6.9 h used (see TIMELOG.md). Target: finish by Oct 31.
+All models local. Deadline: 2026-11-01 23:59 Yerevan time. Budget ~20 h; ~7.3 h used (see TIMELOG.md). Target: finish by Oct 31.
 
 ## How we work (agreed)
 - The user (junior Python dev, new to ML/audio) wants to understand every decision; explain simply.
@@ -97,6 +97,7 @@ values and one open issue (unexplained silent mic recordings) are in TESTS.md.
 - D-015 Whisper large-v3 ASR baseline (CER 21 % vs medium 37 %, small 43 %; ~1.8 s/phrase). Provisional until M3.
 - D-016 NLLB-200 600M, CTranslate2 int8 on CPU (~0.5 s). Non-commercial license. Verified.
 - D-017 Two threads + Event-based shutdown (fixed lost phrases on Ctrl+C). Verified.
+- D-018 M3: beam 1, no prompt, 100 ms padding (CER 8.6 %, max 1.89 s). Բ→Վ is a Whisper limitation.
 - Lesson: request `int8_float32` explicitly — CTranslate2 silently falls back to float32 if float16 is requested on this GPU.
 
 ## Open items for the user
@@ -121,17 +122,12 @@ M1 audio capture (2 h) → M2 walking skeleton, mic only (2.5 h) → M3 eval set
 | Oct 30 | M6 latency/reliability + README | 3 |
 | Oct 31 | rehearsal, chat export, submit | 2 |
 
-## Next step: M3 in progress (1.5 h cap; ~0.15 h used)
-Already created (2026-10-25, approved by the user, NOT yet run):
-- `eval/sentences.txt` — 10 approved Armenian sentences (Բ/Վ words, the brief's example). Committed; audio is not.
-- `scripts/record_eval.py [--only NN] [--seconds 6]` — shows each sentence, Enter, records 6 s → `eval/audio/evalNN.wav`;
-  flags recordings with peak < 0.02.
-- `scripts/eval_asr.py [--model] [--beam-size] [--prompt]` — live path (mono → 16 kHz → VAD → Whisper), CER per
-  sentence + RESULT line (CER, avg/max ASR time). `--prompt` = neutral Armenian context sharing no words with the set.
-- `hylive/asr.py`: `Transcriber(..., initial_prompt=None)` (default unchanged).
-To do:
-1. User records the set (laptop mic, headphones unplugged): `scripts/record_eval.py`.
-2. Run: `eval_asr.py --beam-size 1`, `--beam-size 5`, `--beam-size 5 --prompt`.
-3. Decision rule (set in advance): lowest CER with max ASR time ≤ ~2.5 s; if beam 5 / prompt gains < ~2 points CER,
-   keep the simpler/faster setting. Record in TESTS.md + DECISIONS.md (update D-015), set the live default.
-4. Optional, only if time remains in the cap: at most one verified community Armenian fine-tune.
+## Done (M3 complete, 2026-10-25)
+- Eval set recorded (`eval/audio/`, git-ignored); `scripts/record_eval.py`, `scripts/eval_asr.py [--beam-size] [--prompt] [--pad-ms]`.
+- Chosen: large-v3, beam 1, no prompt, 100 ms padding — CER 8.6 %, ASR max 1.89 s (D-018). Live default unchanged.
+
+## Next step
+1. M4 (short): measure translation on the evaluation set — English for the correct sentences and for the ASR
+   output — to quantify how ASR errors affect the English (evidence for README). Explain first, wait for approval.
+2. System audio in the live program (`--system`, loopback) + D-010 (no loopback data during silence), max segment ≈5–6 s.
+3. M5 speaker labels (needs 2 helpers + mic-less headphones / adapter).

@@ -11,5 +11,6 @@ Hours are active working time as estimated by the user, not wall-clock time.
 | 2026-10-25 | 01:41 | 02:45 | ~0.6 | M2 | Sub-step 2: silero-vad + torch CPU, segmenter, VAD test on recordings (time away from laptop excluded) |
 | 2026-10-25 | 02:45 | 03:55 | ~1.1 | M2 | Whisper small/medium/large-v3, NLLB translation, live program, shutdown bug fix (M2 complete) |
 | 2026-10-25 | 03:56 | 04:05 | ~0.15 | M3 | Evaluation set (10 sentences) + record/eval scripts written, not yet run |
+| 2026-10-25 | 16:38 | 17:00 | ~0.35 | M3 | Recorded eval set, 4 ASR settings compared, Բ hypothesis tested; M3 closed |
 
-**Total so far:** ~6.9 h of ~20 h
+**Total so far:** ~7.3 h of ~20 h

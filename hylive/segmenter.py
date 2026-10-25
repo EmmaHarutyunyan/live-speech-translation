@@ -43,7 +43,8 @@ class Segmenter:
         self._vad = VADIterator(model, threshold=threshold, sampling_rate=SAMPLE_RATE,
                                 min_silence_duration_ms=min_silence_ms, speech_pad_ms=speech_pad_ms)
         self._max_samples = int(max_segment_s * SAMPLE_RATE)
-        self._preroll = int(preroll_s * SAMPLE_RATE)  # audio kept before a phrase, so padding has data
+        # Audio kept before a phrase, so the padding has data to reach back into (at least padding + 0.2 s).
+        self._preroll = int(max(preroll_s, speech_pad_ms / 1000 + 0.2) * SAMPLE_RATE)
         self._pending = np.empty(0, dtype=np.float32)  # samples waiting to fill the next 512-window
         self._buffer = np.empty(0, dtype=np.float32)   # recent audio already given to the VAD
         self._buffer_start = 0                          # stream sample index of _buffer[0]

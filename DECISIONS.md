@@ -125,7 +125,8 @@ Each entry: what was decided, why, what else was considered, status. Newest at t
 - **Limits:** one sentence is not an evaluation; Armenian accuracy is still poor (Բ→Վ/Հ errors).
   M3 measures cheap improvements (beam size, Armenian initial prompt) and at most one fine-tuned model, capped at 1.5 h.
 - **Alternatives:** small/medium (faster, much worse); large-v3-turbo (not tested yet).
-- **Status:** Provisional baseline until M3.
+- **Status:** Confirmed by M3 (2026-10-25): beam 1, no prompt, 100 ms padding — CER 8.6 % on the 10-sentence
+  evaluation set, ASR max 1.89 s (TESTS.md M3, D-018).
 
 ## D-016 — NLLB-200 distilled 600M via CTranslate2 (CPU, int8) for translation (2026-10-25)
 - **Decision:** Convert `facebook/nllb-200-distilled-600M` once with
@@ -149,3 +150,14 @@ Each entry: what was decided, why, what else was considered, status. Newest at t
   the Event avoids relying on it. Crashes in a thread are stored and re-raised by the main thread (fail loudly).
 - **Verified:** TESTS.md M2 live tests 1 and 2.
 - **Status:** Verified 2026-10-25.
+
+## D-018 — M3: keep beam 1, no initial prompt, 100 ms VAD padding (2026-10-25)
+- **Decision rule (set before measuring):** lowest CER with max ASR time ≤ ~2.5 s; improvements < ~2 CER points do
+  not justify a slower or more complex setting.
+- **Results (TESTS.md M3):** beam 1 8.6 % / max 1.89 s; beam 5 6.4 % / max 3.73 s (too slow); beam 5 + prompt
+  12.8 % (hallucination); pad 300 ms 7.7 % (+0.9 points only, Բ errors unchanged).
+- **Hypothesis tested and rejected:** "VAD cuts off the first sound, causing Բ→Վ". With 300 ms padding the same
+  words were still wrong → Whisper limitation, documented as a known limitation.
+- **Kept in code:** `eval_asr.py --pad-ms` and a pre-roll of at least padding + 0.2 s in the segmenter (no effect at 100 ms).
+- **Not done (time cap):** community Armenian fine-tuned Whisper models — a possible improvement listed for the README.
+- **Status:** Decided 2026-10-25. M3 closed (~0.5 h of the 1.5 h cap).
