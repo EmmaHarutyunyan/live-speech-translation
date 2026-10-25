@@ -1,4 +1,4 @@
-# HANDOVER — M3 complete; next: translation check (M4) and system audio
+# HANDOVER — M4 complete; next: system audio in the live program
 
 Written 2026-10-21 at the end of M0; updated 2026-10-23 after M1 and M2 sub-step 1; 2026-10-25 after M2 (complete). Both were done in the same Cowork
 session (session 01); `chats/INDEX.md` needs updating accordingly.
@@ -9,7 +9,7 @@ New session: read this file, then `CLAUDE.md` (project rules). Look up details i
 Python terminal program: capture microphone + system audio at the same time, transcribe spoken Armenian,
 translate to English, print each segment with time, speaker (`Me` / `Speaker 1`, `Speaker 2`, … stable for
 the session), Armenian original and English translation — at most 5 s after the end of a phrase.
-All models local. Deadline: 2026-11-01 23:59 Yerevan time. Budget ~20 h; ~7.3 h used (see TIMELOG.md). Target: finish by Oct 31.
+All models local. Deadline: 2026-11-01 23:59 Yerevan time. Budget ~20 h; ~7.5 h used (see TIMELOG.md). Target: finish by Oct 31.
 
 ## How we work (agreed)
 - The user (junior Python dev, new to ML/audio) wants to understand every decision; explain simply.
@@ -126,8 +126,12 @@ M1 audio capture (2 h) → M2 walking skeleton, mic only (2.5 h) → M3 eval set
 - Eval set recorded (`eval/audio/`, git-ignored); `scripts/record_eval.py`, `scripts/eval_asr.py [--beam-size] [--prompt] [--pad-ms]`.
 - Chosen: large-v3, beam 1, no prompt, 100 ms padding — CER 8.6 %, ASR max 1.89 s (D-018). Live default unchanged.
 
+## Done (M4 complete, 2026-10-25)
+- `eval_asr.py --translate`: NLLB 10/10 understandable on correct Armenian; from ASR text 2 correct / 3 gist / 5 wrong.
+  Translator kept; ASR is the limit (TESTS.md M4). Revisit ASR (e.g. beam 5 + shorter max segment) only if time remains.
+
 ## Next step
-1. M4 (short): measure translation on the evaluation set — English for the correct sentences and for the ASR
-   output — to quantify how ASR errors affect the English (evidence for README). Explain first, wait for approval.
-2. System audio in the live program (`--system`, loopback) + D-010 (no loopback data during silence), max segment ≈5–6 s.
-3. M5 speaker labels (needs 2 helpers + mic-less headphones / adapter).
+1. System audio in the live program: `--system N` (default: loopback of default speakers), a second capture +
+   segmentation thread labelled per stream, shared processing thread; handle D-010 (no loopback data during silence).
+   First tests with an Armenian YouTube video in headphones. Explain design first, wait for approval.
+2. M5 speaker labels (needs 2 helpers + mic-less headphones / adapter).

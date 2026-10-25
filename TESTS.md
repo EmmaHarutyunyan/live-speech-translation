@@ -67,8 +67,8 @@ Settings: threshold 0.5, min silence 500 ms, max segment 10 s, speech padding 10
 - ✅ R2-2 CER measured per setting with `scripts/eval_asr.py`; results below and in DECISIONS.md D-015/D-018
 
 ## R3 — English translation
-- ☐ R3-1 Fixed Armenian sentence list with reference English; each candidate model judged "understandable" or not
-- ☐ R3-2 Every transcribed segment gets an English line
+- ✅ R3-1 NLLB-200 judged on the 10 evaluation sentences (user + Claude agreed, 2026-10-25): see M4 table below
+- ✅ R3-2 Every transcribed segment gets an English line (live program and `eval_asr.py --translate`)
 
 ## R4 — Speaker identification
 - ☐ R4-1 Everything from the mic is labelled `Me`
@@ -130,3 +130,22 @@ Decision rule set in advance: lowest CER with max ASR time ≤ ~2.5 s; gains < ~
   Other recurring errors: ճ→ջ (սուրջ), dropped հ (շնորակալություն), split words (երեկ ոյան).
 - Note: 8.6 % CER on read sentences is much better than the 21 % on the earlier spontaneous test recording —
   clear speech helps a lot (relevant for the interview).
+
+## M4 — translation on the evaluation set (2026-10-25, `scripts/eval_asr.py --translate`, NLLB-200 600M CPU int8)
+Judged "understandable?" (the brief's wording) by the user and Claude.
+| # | EN from the correct Armenian | EN from the ASR text (what the live program shows) |
+|---|---|---|
+| 01 | ✅ Hi, how are you? | ❌ Wow, what do you look like? (Բ→Վ) |
+| 02 | ✅ I'm fine, thank you. | ⚠️ Thank you very much. (gist only) |
+| 03 | ✅ I'm meeting my friends tomorrow. | ✅ identical |
+| 04 | ✅ They're all home now. | ✅ They've already returned home. |
+| 05 | ✅ We're testing the new program today. | ⚠️ This is how we test the new program. |
+| 06 | ✅ Can you repeat the last sentence? | ❌ You can make the last statement. |
+| 07 | ✅ It was raining last night. | ❌ It was raining about three feet. |
+| 08 | ✅ The doctor will call you in the morning. | ❌ The singer will be alive tomorrow morning. |
+| 09 | ✅ Our meeting was moved to the next week. | ⚠️ …moved to the next round. |
+| 10 | ✅ I like to drink coffee before work. | ❌ I like to drink seriously before work. (սուրջ for սուրճ) |
+| | **10/10 understandable** | **2 correct, 3 gist, 5 wrong** |
+- Translation time 0.38–0.53 s per sentence.
+- KNOWN LIMITATION: the translator is good, but single-letter ASR errors often flip the meaning (coffee → seriously,
+  doctor → singer). Improving the English means improving the Armenian ASR, not the translator.

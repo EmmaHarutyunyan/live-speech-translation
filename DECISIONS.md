@@ -137,7 +137,10 @@ Each entry: what was decided, why, what else was considered, status. Newest at t
 - **Setup detail:** set `$env:HF_HOME = "D:\Em\mathrix\models\hf_home"` before converting, otherwise the 2.5 GB
   original model is downloaded to C: (D-004). Needs `transformers` (installed 2026-10-25).
 - **License:** NLLB-200 is released for non-commercial use (CC-BY-NC 4.0) — acceptable for this challenge; stated in README.
-- **Alternatives:** Helsinki-NLP opus-mt-hy-en (smaller/faster, not tested); NLLB on the GPU (not needed so far).
+- **Alternatives:** Helsinki-NLP opus-mt-hy-en (smaller/faster) — considered, NOT tested: the rule (set before M4) was
+  to test it only if > 3 of 10 reference translations were not understandable; NLLB got 10/10. NLLB on the GPU — not needed.
+- **M4 evidence (2026-10-25):** 10/10 reference sentences understandable; from ASR text 2 correct, 3 gist, 5 wrong —
+  errors come from the ASR (TESTS.md M4).
 - **Status:** Verified 2026-10-25.
 
 ## D-017 — Two worker threads and an Event-based shutdown (2026-10-25)
