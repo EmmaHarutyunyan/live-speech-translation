@@ -9,7 +9,7 @@ Python terminal program: capture microphone + system audio at the same time, tra
 translate to English, print each segment with time, speaker (`Me` / `Speaker 1`, `Speaker 2`, … stable for
 the session), Armenian original and English translation — at most 5 s after the end of a phrase.
 All models local. Deadline: 2026-11-01 23:59 Yerevan time (target: finish Oct 31).
-Budget ~20 h; **~11.5 h used**, ≈ 8.5 h left.
+Budget ~20 h; **~11.9 h used**, ≈ 8 h left.
 
 ## How we work (agreed)
 - The user (junior Python dev, new to ML/audio) wants to understand every decision; explain simply.
@@ -34,7 +34,7 @@ medium, large-v3; NLLB converted to `models/nllb-200-distilled-600M-ct2-int8`.
 
 ## Where we are
 - M0 setup ✅ · M1 audio capture ✅ · M2 live skeleton ✅ · M3 ASR settings ✅ · M4 translation ✅ ·
-  system audio + much of M6 latency work ✅ · **M5 speaker identification ✅** · small fixes ✅ · offline check ✅ · README ☐ · fresh-setup check ☐ · real call ☐ · rehearsal ☐
+  system audio + much of M6 latency work ✅ · **M5 speaker identification ✅** · small fixes ✅ · offline check ✅ · README ✅ (first version, reviewed by user: pending) · fresh-setup check ☐ · real call ☐ · rehearsal ☐
 - Live program: `.\.venv\Scripts\python.exe -m hylive [--list-devices] [--mic N] [--system N] [--sources mic|system|mic,system]
   [--asr-model large-v3] [--min-silence-ms 500] [--max-segment-s 5] [--speaker-threshold 0.35]`. Mic = 9, loopback = 10 on this laptop.
 - Pipeline (D-017/D-021): capture (PortAudio callback, 10 ms blocks) → per source: 16 kHz mono (soxr) + Silero VAD
@@ -74,8 +74,7 @@ Full application test L2: Me + Speaker 1 + Speaker 2 correct; latency Me 100 %, 
 - Mixed Armenian/Russian/English checked and documented as a limitation (TESTS.md).
 
 ## NEXT (in this order, keep it simple)
-1. README (setup incl. audio devices + headphones + keep-alive, download/convert models, run; models + alternatives
-   + reasons with numbers; architecture; limitations; improvements).
+1. ~~README~~ ✅ written (user review pending; fill in the repository URL).
 2. Fresh-setup check following the README (new venv in a temp folder, `requirements.txt`, `download_models.py`,
    NLLB conversion) — at least the steps that are cheap to repeat.
 3. Chat export test; GitHub repo (private first); email Mathrix (visibility, calling app); 2 helpers for a real call.

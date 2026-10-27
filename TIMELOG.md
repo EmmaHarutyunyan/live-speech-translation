@@ -16,5 +16,6 @@ Hours are active working time as estimated by the user, not wall-clock time.
 | 2026-10-25 | 17:07 | 18:50 | ~1.7 | M6 (early) | System audio: keep-alive, two streams, phrase bounds, translation thread, turbo test, Test A, real-world test, docs |
 | 2026-10-27 | 17:40 | 19:25 | ~1.7 | M5 | Speaker ID: option check, SpeechBrain install, 3 recordings with ground truth, short-phrase rule, live L1/L2, docs |
 | 2026-10-27 | 19:25 | 20:00 | ~0.6 | M6 | Echo check, mixed-language check, small fixes, offline mode + download script, docs |
+| 2026-10-27 | 20:00 | 20:20 | ~0.4 | M7 | README (first complete version), download script tested |
 
-**Total so far:** ~11.5 h of ~20 h (≈ 8.5 h left; target: finish Oct 30, deadline Nov 1 23:59)
+**Total so far:** ~11.9 h of ~20 h (≈ 8 h left; target: finish Oct 30, deadline Nov 1 23:59)

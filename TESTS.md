@@ -91,7 +91,9 @@ Settings: threshold 0.5, min silence 500 ms, max segment 10 s, speech padding 10
 - ☐ C-3 Repo contains no model weights, audio recordings or keys (`git ls-files` check)
 
 ## Deliverables
-- ☐ D-1 README: setup + run + audio device setup; models + alternatives + reasons; architecture; limitations + improvements
+- ✅ D-1 README written 2026-10-27 (setup + offline, audio devices, run, architecture, models + alternatives + reasons,
+  test results incl. phrases over 5 s, limitations, improvements). Every install step run on this laptop; a full
+  fresh install in a new folder is still to do.
 - ☐ D-2 `chats/` contains every Cowork session, full and unedited, one `.md` file each (checked against `chats/INDEX.md`)
 - ☐ D-3 Fresh rehearsal: program installed and audio setup working, live call with ≥ 2 people on the call side
 

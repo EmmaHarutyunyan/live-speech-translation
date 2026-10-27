@@ -229,7 +229,7 @@ Each entry: what was decided, why, what else was considered, status. Newest at t
 - **Why:** The brief requires local processing, and the interview laptop may be offline. Wi-Fi-off test: Whisper and
   VAD loaded, but the NLLB tokenizer (`transformers`) tried to list the repository files online and hung in retries.
 - **Verified:** full program with Wi-Fi off, all 4 models, no network attempts (TESTS.md C-2).
-- **Status:** Verified 2026-10-27. `download_models.py` still to be tested in the fresh-setup check.
+- **Status:** Verified 2026-10-27; `download_models.py` ran successfully (3/3) the same day.
 
 ## D-025 — Small reliability fixes (2026-10-27)
 - Strip "\ufffd" from ASR text (half Armenian character at 5 s cuts). Extra repetition rule: ≥ 8 words with < 40 %
