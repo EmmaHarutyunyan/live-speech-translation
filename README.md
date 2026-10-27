@@ -65,8 +65,8 @@ one that supports this GPU generation ([D-005](DECISIONS.md)).
 All commands: a **normal (non-administrator) PowerShell**, in the project folder.
 
 ```powershell
-git clone <repository-url> mathrix
-cd mathrix
+git clone https://github.com/EmmaHarutyunyan/live-speech-translation.git
+cd live-speech-translation
 
 # 1. Virtual environment (no activation needed; we always call its python.exe directly)
 py -3.12 -m venv .venv

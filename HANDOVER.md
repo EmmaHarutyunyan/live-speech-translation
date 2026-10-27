@@ -73,12 +73,24 @@ Full application test L2: Me + Speaker 1 + Speaker 2 correct; latency Me 100 %, 
 - Offline: `HF_HUB_OFFLINE=1` in the live program + `scripts/download_models.py`; Wi-Fi-off run passed (D-024).
 - Mixed Armenian/Russian/English checked and documented as a limitation (TESTS.md).
 
-## NEXT (in this order, keep it simple)
-1. ~~README~~ ✅ written (user review pending; fill in the repository URL).
-2. Fresh-setup check following the README (new venv in a temp folder, `requirements.txt`, `download_models.py`,
-   NLLB conversion) — at least the steps that are cheap to repeat.
-3. Chat export test; GitHub repo (private first); email Mathrix (visibility, calling app); 2 helpers for a real call.
-4. Real call (Meet/Zoom) with 2 helpers; rehearsal; final chat export; submit.
+## NEXT — 2026-10-28: translation accuracy (user's priority), capped at ~2.5 h
+Known: NLLB on correct Armenian 10/10 understandable; on Whisper text 2 correct / 3 gist / 5 wrong → mainly Whisper
+spelling errors, but a more robust translator might still help. Keep changes small and measurable; don't break what works.
+0. Baseline: English references for the 10 eval sentences (`eval/translations.txt`, user checks them); add chrF
+   (simple, no new dependency) to `eval_asr.py --translate`. ALSO a small natural-speech set: user records ~6
+   spontaneous/colloquial sentences (incl. 1–2 with Russian/English words), writes down what she said + we agree on
+   English references → same scoring (eval set option `--set natural`, audio git-ignored).
+1. Whisper `task="translate"` (English directly from audio, no new model) — quality + extra GPU time.
+2. NLLB-200 distilled 1.3B (CTranslate2 int8, CPU) on the same Whisper text — quality + CPU time.
+3. At most ONE Armenian fine-tuned Whisper — verify existence, reported results, size, CTranslate2 conversion first.
+Not feasible: SeamlessM4T-size models (VRAM/CPU).
+Decision rule (set 2026-10-27): keep a change only if clearly better English (≥ +2 sentences up a category or clearly
+higher chrF) AND ASR max ≲ 2.5 s, translation max ≲ 1.5 s. Combine options only if the combination is measured too.
+
+## Then
+- Real call (Meet/Zoom) with 2 helpers (~10 min) — date to be set; fresh install in a new folder; rehearsal;
+  final chat export (after the last message) into `chats/` + `chats/INDEX.md`; answer from Mathrix (visibility, app).
+- Repository: https://github.com/EmmaHarutyunyan/live-speech-translation (private, pushed 2026-10-27).
 
 ## OPEN ISSUES before submission (priority order)
 1. ~~Echo / headset mic~~ — echo check passed at interview volume (D-012); re-check in the real call. Was: get mic-less headphones (2-ring plug) or a TRRS→TRS adapter; then re-run
