@@ -12,17 +12,30 @@ Threads (one capture + segmentation pipeline per source; shared ASR and translat
                                                                                         phrase queue -> ASR thread (GPU)
   PortAudio callback (system) -> audio queue (system) -> segmentation thread (system) --/      -> text queue -> translation thread (CPU) -> terminal
 The GPU transcribes the next phrase while the CPU translates the previous one (D-021).
+System-side phrases get a speaker label (voice fingerprint + online clustering) in the translation thread (D-023).
 A silent output stream keeps the loopback device delivering data during silence (D-010, D-019).
 """
 
-import argparse
-import queue
-import threading
-import time
+import os
+
+# Local only (brief): load every model from models/ and never contact the Hugging Face servers. Without this, the
+# NLLB tokenizer checks online for updated files and hangs without internet (found 2026-10-27, D-024).
+# Models are downloaded once during setup with scripts/download_models.py. Must be set before any HF library import.
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+
+import argparse  # noqa: E402
+import queue  # noqa: E402
+import threading  # noqa: E402
+import time  # noqa: E402
+import warnings  # noqa: E402
+
+# Harmless warning printed by silero-vad's model loader on every start (D-014); hidden so the live output stays readable.
+warnings.filterwarnings("ignore", message=r"`torch\.jit\.load` is deprecated", category=FutureWarning)
 
 from hylive.asr import Transcriber  # imported first: registers the NVIDIA DLLs (D-008)
 from hylive.translate import Translator
 
+import numpy as np  # noqa: E402
 import pyaudiowpatch as pyaudio  # noqa: E402
 
 from hylive.audio_capture import (  # noqa: E402
@@ -30,10 +43,10 @@ from hylive.audio_capture import (  # noqa: E402
 )
 from hylive.audio_convert import Resampler, to_float32_frames, to_mono  # noqa: E402
 from hylive.segmenter import Segmenter, load_vad_model  # noqa: E402
+from hylive.speakers import SpeakerEncoder, SpeakerTracker  # noqa: E402
 
 STOP = None  # put on a queue to tell the next thread to finish
 SOURCES = ("mic", "system")
-LABELS = {"mic": "Me", "system": "Speaker ?"}  # real speaker labels for the system side come in M5
 
 
 def format_time(seconds: float) -> str:
@@ -80,17 +93,28 @@ def transcribe_phrases(phrase_q: queue.Queue, text_q: queue.Queue, transcriber: 
         text_q.put((seg, asr, time.monotonic() - t0, phrase_q.qsize()))
 
 
-def translate_and_print(text_q: queue.Queue, translator: Translator, clocks: dict, stats: dict) -> None:
-    """Translation thread (CPU): Armenian text -> English text -> terminal. The only thread that prints phrases."""
+def translate_and_print(text_q: queue.Queue, translator: Translator, clocks: dict, stats: dict,
+                        encoder: SpeakerEncoder | None, tracker: SpeakerTracker | None) -> None:
+    """Translation thread (CPU): speaker label + Armenian text -> English text -> terminal. The only printer."""
     while True:
         item = text_q.get()
         if item is STOP:
             return
         seg, asr, asr_time, asr_queue = item
         t0 = time.monotonic()
+        speaker_info = ""
+        if seg.source == "mic":
+            label = "Me"
+        elif asr.repetitive:
+            label = "Speaker ?"  # noise/echo: not used for speaker identification, so it cannot spoil a voice average
+        else:
+            label, similarity = tracker.assign(encoder.embed(seg.audio), seg.end_s - seg.start_s)
+            speaker_info = f", speaker {time.monotonic() - t0:.1f} s, similarity {similarity:.2f}"
+        t1 = time.monotonic()
         if asr.repetitive:
             # Repetition loop (typical for noise or echo): show it, but do not spend seconds translating it (D-020).
-            hy = f"(repetitive output discarded - likely noise or echo; compression ratio {asr.compression_ratio:.1f})"
+            hy = (f"(repetitive output discarded - likely noise or echo; compression ratio {asr.compression_ratio:.1f}, "
+                  f"different words {asr.unique_word_ratio:.0%})")
             en = ""
             stats[seg.source]["discarded"] += 1
         else:
@@ -103,10 +127,10 @@ def translate_and_print(text_q: queue.Queue, translator: Translator, clocks: dic
         # Latency as defined in the brief: end of the spoken phrase -> English line printed.
         # (Approximation: assumes no gaps in the stream — true for the mic and, with the keep-alive, for loopback.)
         latency = done_at - (stream_start + seg.end_s)
-        print(f"[{format_time(session_time)}] {LABELS[seg.source]}", flush=True)
+        print(f"[{format_time(session_time)}] {label}", flush=True)
         print(f"HY: {hy or '(nothing recognised)'}")
         print(f"EN: {en}")
-        print(f"    latency {latency:.1f} s (ASR {asr_time:.1f} s, translation {done_at - t0:.1f} s, "
+        print(f"    latency {latency:.1f} s (ASR {asr_time:.1f} s, translation {done_at - t1:.1f} s{speaker_info}, "
               f"queue {asr_queue}+{text_q.qsize()})\n", flush=True)
         stats[seg.source]["printed"] += 1
         stats[seg.source]["latencies"].append(latency)
@@ -142,6 +166,8 @@ def main() -> None:
     parser.add_argument("--min-silence-ms", type=int, default=500)
     parser.add_argument("--max-segment-s", type=float, default=5.0,
                         help="cut phrases longer than this (default 5 s: longer phrases broke the 5 s latency, D-020)")
+    parser.add_argument("--speaker-threshold", type=float, default=0.35,
+                        help="voice similarity needed to count as a known speaker (default 0.35, D-023)")
     parser.add_argument("--sources", default="mic,system",
                         help="testing aid: 'mic', 'system' or 'mic,system' (default, required by the brief)")
     args = parser.parse_args()
@@ -149,6 +175,8 @@ def main() -> None:
     if not sources or any(s not in SOURCES for s in sources) or len(set(sources)) != len(sources):
         raise ValueError(f"--sources must be 'mic', 'system' or 'mic,system', got {args.sources!r}")
 
+    if os.environ["HF_HUB_OFFLINE"] == "1":
+        print("offline mode: all models are loaded from models/ (no internet needed)")
     p = pyaudio.PyAudio()
     try:
         if args.list_devices:
@@ -184,6 +212,12 @@ def main() -> None:
         print("loading NLLB translation on CPU ...", flush=True)
         translator = Translator()
         translator.translate("Բարև")  # warm-up
+        encoder = tracker = None
+        if "system" in sources:
+            print("loading speaker model on CPU ...", flush=True)
+            encoder = SpeakerEncoder()
+            encoder.embed(np.zeros(16_000, dtype=np.float32))  # warm-up
+            tracker = SpeakerTracker(args.speaker_threshold)
 
         audio_qs = {s: queue.Queue() for s in sources}
         phrase_q: queue.Queue = queue.Queue()
@@ -197,7 +231,8 @@ def main() -> None:
         text_q: queue.Queue = queue.Queue()
         processing_done = threading.Event()  # set when the translation thread (the last one) has finished
         start_thread(transcribe_phrases, (phrase_q, text_q, transcriber, stats, len(sources)), errors)
-        start_thread(translate_and_print, (text_q, translator, clocks, stats), errors, processing_done)
+        start_thread(translate_and_print, (text_q, translator, clocks, stats, encoder, tracker), errors,
+                     processing_done)
 
         if keep_alive:
             keep_alive.start()
@@ -232,6 +267,8 @@ def main() -> None:
                 under = sum(1 for x in lat if x <= 5.0)
                 print(f"       latency: median {lat[len(lat) // 2]:.1f} s, max {lat[-1]:.1f} s, "
                       f"<= 5 s: {under}/{len(lat)} ({100 * under / len(lat):.0f} %)")
+        if tracker:
+            print(f"speakers identified on the system side: {tracker.count} (threshold {args.speaker_threshold})")
     finally:
         p.terminate()
 

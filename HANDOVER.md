@@ -1,15 +1,15 @@
-# HANDOVER — next: M5 speaker identification
+# HANDOVER — M5 + fixes + offline done; next: README
 
-Updated 2026-10-25 18:50 (end of the day). Everything so far happened in ONE Cowork session (session 01).
+Updated 2026-10-27 19:25. Everything so far happened in ONE Cowork session (session 01).
 Read this file, then `CLAUDE.md`. Details: `TESTS.md` (all measurements), `DECISIONS.md` (D-001 … D-022),
-`TIMELOG.md`. The official Mathrix brief is the source of truth.
+`TIMELOG.md`. The official Mathrix brief is the source of truth. Target: finish by Oct 30.
 
 ## Goal (from the brief)
 Python terminal program: capture microphone + system audio at the same time, transcribe spoken Armenian,
 translate to English, print each segment with time, speaker (`Me` / `Speaker 1`, `Speaker 2`, … stable for
 the session), Armenian original and English translation — at most 5 s after the end of a phrase.
 All models local. Deadline: 2026-11-01 23:59 Yerevan time (target: finish Oct 31).
-Budget ~20 h; **~9.2 h used**, ≈ 10.8 h left.
+Budget ~20 h; **~11.5 h used**, ≈ 8.5 h left.
 
 ## How we work (agreed)
 - The user (junior Python dev, new to ML/audio) wants to understand every decision; explain simply.
@@ -34,12 +34,13 @@ medium, large-v3; NLLB converted to `models/nllb-200-distilled-600M-ct2-int8`.
 
 ## Where we are
 - M0 setup ✅ · M1 audio capture ✅ · M2 live skeleton ✅ · M3 ASR settings ✅ · M4 translation ✅ ·
-  system audio + much of M6 latency work ✅ · **M5 speaker identification ☐ (next)** · README ☐ · rehearsal ☐
+  system audio + much of M6 latency work ✅ · **M5 speaker identification ✅** · small fixes ✅ · offline check ✅ · README ☐ · fresh-setup check ☐ · real call ☐ · rehearsal ☐
 - Live program: `.\.venv\Scripts\python.exe -m hylive [--list-devices] [--mic N] [--system N] [--sources mic|system|mic,system]
-  [--asr-model large-v3] [--min-silence-ms 500] [--max-segment-s 5]`. Mic = 9, loopback = 10 on this laptop.
+  [--asr-model large-v3] [--min-silence-ms 500] [--max-segment-s 5] [--speaker-threshold 0.35]`. Mic = 9, loopback = 10 on this laptop.
 - Pipeline (D-017/D-021): capture (PortAudio callback, 10 ms blocks) → per source: 16 kHz mono (soxr) + Silero VAD
   segmenter (own model per source) → shared ASR thread (Whisper large-v3, GPU, int8_float32, beam 1, temp 0,
-  128-token cap, repetition guard) → translation thread (NLLB-200 600M, CPU int8) → terminal.
+  128-token cap, repetition guard) → translation thread (speaker label for system phrases: SpeechBrain ECAPA +
+  online clustering, D-023; then NLLB-200 600M, CPU int8) → terminal.
   Keep-alive silence on the speakers while capturing loopback (D-019).
 - Output per block: `[hh:mm:ss] Me|Speaker ?`, HY, EN, `latency X s (ASR, translation, queue A+B)`.
   Exit summary per source: detected / printed / discarded, PortAudio flags, latency median / max / % ≤ 5 s.
@@ -53,37 +54,45 @@ medium, large-v3; NLLB converted to `models/nllb-200-distilled-600M-ct2-int8`.
 - `hylive/segmenter.py` — Segment, load_vad_model, Segmenter (process, flush)
 - `hylive/asr.py` — Transcriber (transcribe, transcribe_full → AsrResult), MAX_NEW_TOKENS, MAX_COMPRESSION_RATIO
 - `hylive/translate.py` — Translator (NLLB via CTranslate2)
+- `hylive/speakers.py` — SpeakerEncoder (ECAPA), SpeakerTracker (threshold, short-phrase rule, count)
 - `hylive/gpu.py` — register_nvidia_dlls (must run before importing ctranslate2/faster_whisper)
 - `hylive/__main__.py` — CLI, threads, output, summary
 - `scripts/` — list_devices, record_test (--label, --keep-alive), convert_test, vad_test, asr_test, mt_test,
-  record_eval, eval_asr (--model, --beam-size, --prompt, --pad-ms, --translate), play_eval (--ids, --gap), gpu_smoke_test
+  record_eval, eval_asr (--model, --beam-size, --prompt, --pad-ms, --translate), play_eval (--ids, --gap),
+  speaker_test (--thresholds), gpu_smoke_test
+- `recordings/20261027-184504_twowomen_system.wav` + segments (git-ignored): M5 test clip with ground truth
 - `eval/sentences.txt` (committed), `eval/audio/` (git-ignored)
 
-## NEXT: M5 speaker identification (~3.5 h budget) — explain first, wait for approval
-Requirement: system side → `Speaker 1`, `Speaker 2`, …; same person keeps the same label for the session; mic = `Me`.
-Plan to propose (verify every library fact first):
-1. Speaker embeddings ("voice fingerprints") on the CPU, e.g. SpeechBrain ECAPA-TDNN (`speechbrain/spkrec-ecapa-voxceleb`);
-   check install size, licence, Windows + torch 2.14 CPU compatibility, model download location (models/, D-004).
-2. Online clustering: compare each new system-side phrase with the known speakers (cosine similarity); above a
-   threshold → same speaker (update its average embedding); otherwise → new `Speaker N`. Short phrases (< ~1 s) are
-   unreliable → decide how to label them (e.g. keep the previous speaker, shown honestly).
-3. Where it runs: in the pipeline for system phrases only, without hurting latency (CPU, parallel to the GPU ASR).
-4. Test offline first with a 2-voice recording (`record_test.py --keep-alive --label ...` of an interview video,
-   `--sources system`), measure label errors; tune the threshold by numbers; then live.
-5. Real test with 2 helpers in a call (needs mic-less headphones / adapter).
+## Done (M5, 2026-10-27)
+Speaker identification works offline (3 recordings, 0 wrong labels) and live (L1b, L2); threshold 0.35; see D-023.
+Full application test L2: Me + Speaker 1 + Speaker 2 correct; latency Me 100 %, system 88 % ≤ 5 s.
+
+## Done since M5 (2026-10-27)
+- Echo check at interview volume: 0 echo phrases → keep current headphones, moderate volume (D-012).
+- Small fixes (D-025): "�" stripped, extra loop rule, torch.jit warning hidden. Eval CER 8.6 % unchanged.
+- Offline: `HF_HUB_OFFLINE=1` in the live program + `scripts/download_models.py`; Wi-Fi-off run passed (D-024).
+- Mixed Armenian/Russian/English checked and documented as a limitation (TESTS.md).
+
+## NEXT (in this order, keep it simple)
+1. README (setup incl. audio devices + headphones + keep-alive, download/convert models, run; models + alternatives
+   + reasons with numbers; architecture; limitations; improvements).
+2. Fresh-setup check following the README (new venv in a temp folder, `requirements.txt`, `download_models.py`,
+   NLLB conversion) — at least the steps that are cheap to repeat.
+3. Chat export test; GitHub repo (private first); email Mathrix (visibility, calling app); 2 helpers for a real call.
+4. Real call (Meet/Zoom) with 2 helpers; rehearsal; final chat export; submit.
 
 ## OPEN ISSUES before submission (priority order)
-1. **Echo / headset mic (D-012, HIGH):** get mic-less headphones (2-ring plug) or a TRRS→TRS adapter; then re-run
+1. ~~Echo / headset mic~~ — echo check passed at interview volume (D-012); re-check in the real call. Was: get mic-less headphones (2-ring plug) or a TRRS→TRS adapter; then re-run
    the real-world test (both streams) and re-measure latency and "Me" labelling.
-2. **M5 speaker identification** not implemented (system side shows "Speaker ?").
+2. ~~M5 speaker identification~~ ✅ done 2026-10-27 (D-023). Remaining: 10+ min and real-call test.
 3. **Latency under overlapping speech (C-1):** 64–70 % ≤ 5 s with echo. Re-test echo-free; if still needed, consider
    batching queued phrases on the GPU (faster-whisper batched mode) — verify first.
 4. **ASR accuracy limits (README):** word-initial Բ → Վ/dropped; single-letter errors flip the English meaning.
    Optional if time: beam 5 with the shorter 5 s phrases (measure latency); community Armenian fine-tune.
-5. **Cosmetic:** "�" at the end of phrases cut mid-word (strip U+FFFD or similar); "(cut at token limit)" flag
+5. ~~Cosmetic~~ mostly done (D-025); `queue` shows stop signals at shutdown (cosmetic). Was: "�" at the end of phrases cut mid-word (strip U+FFFD or similar); "(cut at token limit)" flag
    never appeared although one output looked truncated ("այդ հ") — check the approximate token count logic;
    torch.jit / Hugging Face symlink + token warnings at start-up (document or silence via env vars).
-6. **Local-only check (C-2):** run with Wi-Fi off after all downloads; Hugging Face may try the network for the
+6. ~~Local-only check (C-2)~~ ✅ (D-024). Was: run with Wi-Fi off after all downloads; Hugging Face may try the network for the
    tokenizer/models → test, possibly set `HF_HUB_OFFLINE=1`.
 7. **README** (setup incl. audio devices, keep-alive, models + alternatives + reasons with numbers, architecture,
    limitations, improvements) — not started. PLAN.md milestone table is outdated (update or point to HANDOVER).
@@ -95,11 +104,11 @@ Plan to propose (verify every library fact first):
 11. **Helpers:** 2 people for a test call (M5 test and final rehearsal); record one 2-voice call for offline tuning.
 12. Optional: Test B with eval clips + reading (clips as call side, known text for both sides).
 
-## Remaining time plan (≈ 10.8 h)
+## Remaining time plan (≈ 9 h, target Oct 30)
 | When | Work | h |
 |---|---|---|
-| Oct 26–27 | M5 speaker identification (offline tests → live) | 3.5 |
-| Oct 27–28 | hardware fix + echo-free real-world test; latency fixes if needed | 1.5 |
-| Oct 29–30 | README, cosmetic fixes, local-only + fresh-setup checks | 3 |
-| Oct 30–31 | rehearsal call with 2 helpers, chat export, repo, submit | 2 |
-| | buffer | ~0.8 |
+| Oct 27 (rest) | small fixes, offline check | 0.5 |
+| Oct 28 | README; hardware fix + echo-free test | 2.5 |
+| Oct 29 | fresh-setup check, real call with 2 helpers, fixes | 2.5 |
+| Oct 30 | rehearsal, chat export, repo, submit | 2 |
+| | buffer | ~1.5 |

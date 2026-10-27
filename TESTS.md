@@ -71,10 +71,13 @@ Settings: threshold 0.5, min silence 500 ms, max segment 10 s, speech padding 10
 - ✅ R3-2 Every transcribed segment gets an English line (live program and `eval_asr.py --translate`)
 
 ## R4 — Speaker identification
-- ⚠️ R4-1 Everything from the mic is labelled `Me` — works, BUT with the headset mic the video/call leaks into the
-  mic (echo) and ~5 of 11 "Me" blocks were echo of the call side (2026-10-25). Fix: hardware (D-012).
-- ☐ R4-2 Two different remote voices get different labels (`Speaker 1`, `Speaker 2`)
-- ☐ R4-3 Labels stay the same for the same person over a 10+ minute session (count wrong labels)
+- ✅ R4-1 Everything from the mic is labelled `Me`. Echo check 2026-10-27: interview at normal interview volume,
+  user silent ~60 s → 0 mic phrases. Earlier runs (2026-10-25, louder video) had echo "Me" blocks → keep the
+  call volume moderate (D-012).
+- ✅ R4-2 Two different remote voices get different labels (`Speaker 1`, `Speaker 2`) — 3 offline recordings with
+  0 wrong labels at threshold 0.35; live: 2 of 2 speakers on two different interviews (2026-10-27, see M5 below)
+- ⚠️ R4-3 Labels stay the same for the same person — ✅ within 80 s recordings, incl. a speaker who returns after
+  30 s (same label again). NOT yet tested over 10+ minutes or with a real call (Meet/Zoom compression).
 
 ## R5 — Live terminal output
 - ✅ R5-1 Each segment shows time, speaker, Armenian original, English translation (mic side, 2026-10-25; re-check with system audio in M5)
@@ -83,7 +86,8 @@ Settings: threshold 0.5, min silence 500 ms, max segment 10 s, speech padding 10
 ## Constraints
 - ⚠️ C-1 Latency: logged per segment; exit summary prints median, max and % ≤ 5 s per source (2026-10-25).
   One side at a time: 100 % ≤ 5 s (median 2.8 s). Both sides overlapping + echo: 64–70 % ≤ 5 s, max 8.7 s. NOT yet met.
-- ☐ C-2 Local only: full run works with Wi-Fi off after models are downloaded
+- ✅ C-2 Local only: full run (mic + system, all 4 models) with Wi-Fi off, 2026-10-27, after adding strict offline
+  mode (D-024). Before the fix the NLLB tokenizer tried to reach huggingface.co and hung (retries).
 - ☐ C-3 Repo contains no model weights, audio recordings or keys (`git ls-files` check)
 
 ## Deliverables
@@ -184,3 +188,50 @@ All runs: detected = printed for both sources, 0 PortAudio problem flags.
 - The live path loses no accuracy vs. offline (Test A). ASR is the accuracy limit; ASR on the GPU is the throughput limit.
 - One side talking at a time: comfortably < 5 s. Overlapping speech + echo saturates the GPU (~0.45 phrases/s × ~2 s).
 - Echo (headset mic hears the headphones) causes ~25 % of the load and all wrongly labelled "Me" blocks.
+
+## M5 — speaker identification (2026-10-27, `scripts/speaker_test.py`, SpeechBrain ECAPA + online clustering)
+Method: record the call side (`record_test.py --keep-alive`), cut phrases like the live program (VAD, max 5 s), label
+with several thresholds, compare with the user's ground truth (who speaks when). Short-phrase rule added after test 1:
+phrases < 1 s never create a new speaker.
+| Recording (60–80 s) | Truth | Same-speaker similarity (≥ 1 s) | First phrase of the new speaker | Wrong labels by threshold |
+|---|---|---|---|---|
+| man + woman | A 7–40 s, B 40–60 s | 0.54–0.77 | 0.21 | 0.2: 4 (B merged) · 0.25–0.4: **0** · (0.5/0.6 before the short-phrase rule: extra speakers) |
+| same gender (first) | A, B, A again | 0.73–0.80 | 0.14 | 0.2–0.4: **0** (returning speaker gets the same label) |
+| two women | A 0–34, B 34–67 (laughing/overlap), A 67–80 | 0.51–0.88 | 0.16 | 0.35–0.5: **0** · 0.55: 2 extra speakers |
+- Mixed phrase at a speaker change (5 s cut across the change) gets the majority voice (similarity 0.46) — the first
+  1–2 s of a new speaker can carry the previous label (limitation).
+- Fingerprint time on the CPU: avg 0.35–0.46 s per phrase (first call ~1 s).
+- Chosen threshold: **0.35** (middle of the range with 0 errors on all three recordings).
+
+### Live tests (2026-10-27)
+- L1a (`--sources system`, a part of the two-women video where mostly ONE woman speaks): all "Speaker 1"; one
+  question at 0.44 similarity merged. Not reproducible offline → verified instead with L1b on the exact recorded clip.
+- **L1b** (`--sources system`, the same clip as the offline two-women test): Speaker 1 0:02–0:34, **Speaker 2**
+  0:39–1:04 (first similarity 0.23), **Speaker 1 again** 1:09–1:17 → matches the ground truth, 2 speakers, 0 errors.
+  Latency 18/18 ≤ 5 s (median 3.9 s, max 4.4 s); 18/18 printed, 1 repetitive fragment discarded (labelled "Speaker ?").
+- **L2 full application** (both sources, man + woman interview + user speaking in pauses):
+  Speaker 1 0:02–0:25, Speaker 2 0:30–1:12 (first similarity 0.17), 2 speakers identified.
+  "Me": 4/4 blocks were really the user (no echo this run); EN 3 of 4 correct (1 wrong: «Վառև…», Բ→Վ).
+  Latency: Me 4/4 ≤ 5 s (median 3.0 s, max 3.9 s); system 14/16 ≤ 5 s (median 4.1 s, max 5.9 s).
+  Over 5 s: first phrase (first speaker-model call 1.0 s) and one repetition loop the guard missed
+  («…այդ համար այդ համար…», compression ratio < 2.4) — visible garbage, did not block the queue. 20/20 printed, 0 flags.
+
+## Small fixes, echo check, mixed language, offline (2026-10-27)
+- Fixes: "�" (half Armenian character at 5 s cuts) removed; extra loop check (≥ 8 words and < 40 % different words
+  → discarded; on real outputs: the missed L2 loop 36 % → discarded, normal sentences 67–100 % → kept);
+  torch.jit FutureWarning hidden in the live program. Regression: eval CER 8.6 % unchanged.
+- Echo check: full program, interview at normal interview volume, user silent → mic detected 0; system 16/16 ≤ 5 s
+  (median 4.0 s, max 4.8 s), 2 speakers identified.
+- Natural / mixed Armenian (mic only, laptop mic, 7 blocks, latency 7/7 ≤ 5 s). Mixed-language input is out of scope
+  in the brief; checked only to document behaviour:
+  | Type | Recognised | English | |
+  |---|---|---|---|
+  | colloquial greeting | Վարև, ոնց է ես, ինչ կա չկա | Hi, how are you, what's wrong? | ⚠️ |
+  | colloquial | Հալա ուրեմն վաղը կտեսնեմ ենք | So I'll see you tomorrow. | ✅ |
+  | Russian «Давай» | դամ ազատլինը զանգի | The lady of liberty is calling. | ❌ |
+  | Russian «Ладно» | լաֆ հետոք խոսենք | Let's talk about it. | ⚠️ |
+  | English meeting/deadline | Մեր միթինգը … դիլնայնը … երկու շապյա | Our meeting has been moved, and the Dillane is now a two-piece. | ⚠️ |
+  | English ok/link/chat | Ոգեյ, ես կեզ լինքը գողարկեմ չատով | Okay, I'm going to steal the cat. | ❌ |
+  Colloquial Armenian works about as well as formal; foreign words are written in Armenian letters (language forced
+  to "hy") and are translated correctly only sometimes; Russian discourse words can derail a sentence. → README limitation.
+- Offline: see C-2 above.

@@ -88,7 +88,9 @@ Each entry: what was decided, why, what else was considered, status. Newest at t
 - **Rejected:** headset cable mic (too weak/variable); Windows "Microphone Boost" (amplifies noise too; system setting).
 - **Evidence 2026-10-25:** with the headset mic, the video/call audio leaks from the earbuds into the mic: ~5 of 11
   "Me" blocks in the real-world run were echo of the call side, adding ~25 % load and wrong "Me" labels.
-- **Status:** Provisional — hardware still needed (mic-less headphones or TRRS→TRS adapter). HIGH PRIORITY before the interview.
+- **Update 2026-10-27:** echo check at normal interview volume (user silent ~60 s): 0 mic phrases → keep the current
+  headphones, no adapter. Rule: keep the call volume moderate; re-check during the real call with helpers.
+- **Status:** Decided 2026-10-27 (re-check in the real call).
 
 ## D-013 — soxr streaming resampler for 48 kHz → 16 kHz (2026-10-23)
 - **Decision:** Average channels to mono, then resample with `soxr.ResampleStream` (soxr 1.1.0, quality "HQ")
@@ -199,3 +201,40 @@ Each entry: what was decided, why, what else was considered, status. Newest at t
 - **Result:** ASR avg 0.93 s (vs 1.70 s) but CER 23.0 %; sentence 02 even came out in Latin/Cyrillic letters despite
   `language="hy"`. → keep large-v3.
 - **Status:** Decided 2026-10-25.
+
+## D-023 — Speaker identification: SpeechBrain ECAPA + online clustering, threshold 0.35 (2026-10-27)
+- **Decision:** For each system-side phrase, a voice fingerprint (SpeechBrain `speechbrain/spkrec-ecapa-voxceleb`,
+  192 numbers, CPU) is compared by cosine similarity with each known speaker's average fingerprint; ≥ 0.35 → that
+  speaker (average updated), otherwise a new `Speaker N`. Phrases < 1 s never create a speaker or change an average.
+  Phrases discarded as repetitive are labelled "Speaker ?" and not fingerprinted. Runs in the translation thread.
+  `--speaker-threshold` to adjust. Model downloaded into `models/` with `LocalStrategy.COPY_SKIP_CACHE` (the default
+  SYMLINK strategy needs admin rights / Developer Mode on Windows).
+- **Why this option (user asked to check whether a new dependency is really needed):**
+  plain audio statistics (no deps) — unreliable for similar voices; Whisper encoder output (no deps) — unproven, and
+  adds GPU load (our bottleneck); ONNX speaker model via onnxruntime (no new pip package) — needs a hand-written
+  copy of the model's exact preprocessing, risk of silent accuracy loss; SpeechBrain — a standard pretrained speaker
+  model, preprocessing built in, minimal own code. Rule set before installing: accept only if torch is not replaced
+  and no very large packages are added. `pip install --dry-run`: torch kept; adds speechbrain 1.1.2, torchaudio
+  2.11.0 (328 kB), scipy (~37 MB) and small helpers. Smoke test passed (torch 2.14.1+cpu with torchaudio 2.11.0).
+- **Evidence:** TESTS.md M5 — 0 wrong labels on three recordings at 0.25–0.4/0.45; live L1b and L2 correct;
+  latency cost ~0.5 s per system phrase, still within 5 s.
+- **Limitations:** first 1–2 s of a new speaker can carry the previous label (5 s cuts); untested over 10+ min and
+  with real call compression; similar voices may need a different threshold.
+- **Status:** Verified 2026-10-27.
+
+## D-024 — Strict offline mode + one-time model download script (2026-10-27)
+- **Decision:** `hylive/__main__.py` sets `HF_HUB_OFFLINE=1` before any library import, so all models are loaded
+  from `models/` and nothing contacts the Hugging Face servers; printed at start-up. `scripts/download_models.py`
+  (run once during setup, with internet) downloads Whisper large-v3, the NLLB tokenizer and the SpeechBrain model.
+- **Why:** The brief requires local processing, and the interview laptop may be offline. Wi-Fi-off test: Whisper and
+  VAD loaded, but the NLLB tokenizer (`transformers`) tried to list the repository files online and hung in retries.
+- **Verified:** full program with Wi-Fi off, all 4 models, no network attempts (TESTS.md C-2).
+- **Status:** Verified 2026-10-27. `download_models.py` still to be tested in the fresh-setup check.
+
+## D-025 — Small reliability fixes (2026-10-27)
+- Strip "\ufffd" from ASR text (half Armenian character at 5 s cuts). Extra repetition rule: ≥ 8 words with < 40 %
+  different words → discarded like a compression-ratio loop (the L2 loop had ratio < 2.4). Hide the harmless
+  torch.jit FutureWarning in the live program. No effect on the eval set (CER 8.6 %).
+- **Not done (decided):** Russian/English words inside Armenian (out of scope; documented); a correction list for
+  frequent errors like «Վարև» → «Բարև» (would hide errors; only specific words).
+- **Status:** Verified 2026-10-27.

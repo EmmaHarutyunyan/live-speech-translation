@@ -19,6 +19,9 @@ COMPUTE_TYPE = "int8_float32"  # the int8 type CTranslate2 supports on the GTX 1
 # Bounds against repetition loops ("այդ այդ այդ ..."), which took 7-8 s each and blocked the queue (D-020).
 MAX_NEW_TOKENS = 128            # far more than 5 s of normal speech needs; a loop stops here
 MAX_COMPRESSION_RATIO = 2.4     # Whisper's own threshold: above it, the text is suspiciously repetitive
+# Loops the compression ratio missed («… այդ համար այդ համար …», 2026-10-27): long text made of few different words.
+MIN_WORDS_FOR_LOOP_CHECK = 8
+MIN_UNIQUE_WORD_RATIO = 0.4
 
 
 @dataclass(frozen=True)
@@ -28,8 +31,15 @@ class AsrResult:
     hit_token_limit: bool       # decoding was stopped by MAX_NEW_TOKENS
 
     @property
+    def unique_word_ratio(self) -> float:
+        words = self.text.split()
+        return len(set(words)) / len(words) if words else 1.0
+
+    @property
     def repetitive(self) -> bool:
-        return self.compression_ratio > MAX_COMPRESSION_RATIO
+        too_few_different_words = (len(self.text.split()) >= MIN_WORDS_FOR_LOOP_CHECK
+                                   and self.unique_word_ratio < MIN_UNIQUE_WORD_RATIO)
+        return self.compression_ratio > MAX_COMPRESSION_RATIO or too_few_different_words
 
 
 class Transcriber:
@@ -62,7 +72,8 @@ class Transcriber:
         )
         segments = list(segments)  # decoding runs while the segments are read
         return AsrResult(
-            text=" ".join(s.text.strip() for s in segments).strip(),
+            # "\ufffd" = half an Armenian character when a phrase is cut in the middle of a word (5 s limit)
+            text=" ".join(s.text.strip() for s in segments).replace("\ufffd", "").strip(),
             compression_ratio=max((s.compression_ratio for s in segments), default=0.0),
             hit_token_limit=sum(len(s.tokens) for s in segments) >= MAX_NEW_TOKENS - 2,  # approximate
         )
