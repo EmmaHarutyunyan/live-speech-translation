@@ -237,3 +237,53 @@ phrases < 1 s never create a new speaker.
   Colloquial Armenian works about as well as formal; foreign words are written in Armenian letters (language forced
   to "hy") and are translated correctly only sometimes; Russian discourse words can derail a sentence. → README limitation.
 - Offline: see C-2 above.
+
+## Translation accuracy, 2026-10-28 (existing models only; `eval_asr.py --translate`, main set, 10 sentences)
+English references: `eval/translations.txt`. chrF = character n-gram F-score vs. the reference (0–100; penalises
+correct paraphrases, e.g. "They're all home now" = 14 → used for comparing settings; human judgement is the main measure).
+| Setting | CER | ASR avg / max | chrF EN shown | Judgement (correct/gist/wrong) | Extra time |
+|---|---|---|---|---|---|
+| **Baseline** (large-v3 beam 1, NLLB beam 2) | 8.6 % | 1.77 / 2.08 s | **49.3** | **2 / 3 / 5** | MT 0.45 / 0.53 s |
+| NLLB from the correct Armenian (upper bound) | — | — | 68.1 | 10/10 understandable | — |
+| Whisper `task="translate"` (English directly from audio) | — | — | 42.9 | 2 / 1 / 7 (hallucinations: "The dough should be smooth…") | +1.04 / 1.13 s GPU |
+| Whisper beam 2 | 10.2 % | – / 2.25 s | 46.6 | worse than baseline | — |
+| Whisper beam 3 | 8.6 % | – / 2.12 s | 46.2 | worse than baseline | — |
+| NLLB beam 4 | 8.6 % | 1.84 / 2.40 s | 48.7 | 2 / 3 / 5 (06 changed, still wrong) | MT 0.48 / 0.56 s |
+- ~19 chrF points are lost through Whisper's spelling errors (68.1 → 49.3): the ASR is the main cause.
+- Decision (rule set before testing: ≥ +2 sentences up a category or chrF +3, ASR max ≤ 2.6 s, MT max ≤ 0.8 s):
+  **keep the original settings**; live application unchanged. (Beam 2/3 numbers as reported by the user from her runs.)
+- New models were deliberately NOT added (user: keep the project light; reviewers should download only what is used).
+  Candidates checked on Hugging Face and documented only: Chillarmo/whisper-large-v3-turbo-armenian (self-reported
+  CER 2.86 % on Common Voice, Apache-2.0, likely CTranslate2-compatible), BuzzASR/armenian (self-reported CER 3.72 %
+  FLEURS, MIT, custom tokenizer → likely incompatible with faster-whisper), NLLB-200 distilled 1.3B (pre-converted
+  CTranslate2 int8 exists).
+
+## Natural speech set, 2026-10-28 (`eval_asr.py --set natural --translate`, 6 colloquial sentences, normal call speed)
+| # | Said | Whisper heard | English shown | |
+|---|---|---|---|---|
+| n01 | Լսի, էսօր ժամը քանիսի՞ն ենք հանդիպում | լսի է սորջամը քանիսին ենք հանդիպում | He's going to hear how many people we're meeting. | ❌ |
+| n02 | Ներողություն, մի քիչ ուշանում եմ, տասը րոպեից կլինեմ | Ներեղություն մի քիչ ուշանում եմ, տասիրով բերից գրինեմ | Sorry, I'm a little late. I'll write it down. | ⚠️ |
+| n03 | Ոնց անցավ երեկվա հանդիպումը, ամեն ինչ նորմա՞լ էր | ոնձ անձավ երեկվահ անդիպումը ամեն ինչ նորմալ էր | Even in the late evening, the touch was normal. | ❌ |
+| n04 | Ես արդեն ուղարկել եմ ֆայլը, կնայես, երբ ժամանակ ունենաս | ես արդեն ուղարկերն եմ վայլը կնայիս, երբ ժամանակ ունենս | I'm already sending the wolf when I have time. | ❌ |
+| n05 | Ладно, եկ վաղը առավոտյան նորից խոսենք | լատնում, ես վաղա առավոթյան, եկ վաղա առավոթյան նորից խոս | Let's go back to bed tomorrow night. Let's talk tomorrow night again. | ⚠️ |
+| n06 | Մեր project-ը գրեթե պատրաստ է, մնացել է միայն testing-ը | Մեր պրոջեկտը գրետ է պատրաստվյնացիլ է միայն թեստինգը | Our project is a cage, just testing. | ⚠️ |
+- Result: CER 27.2 % (inflated: n05/n06 references contain Cyrillic/Latin words that Whisper writes in Armenian
+  letters); pure-Armenian sentences n01–n04 ≈ 12 % (read sentences: 8.6 %). English shown: 0 correct / 3 gist / 3 wrong,
+  chrF 32.8; from the correct Armenian NLLB is good on all 6 (chrF 68.9). ASR 2.22 / 2.63 s, MT 0.63 / 0.79 s.
+- Error types: word boundaries («է սորջամը» for «էսօր ժամը»), similar consonants (ց→ձ, ֆ→վ, Բ→Վ), foreign words in
+  Armenian letters, one repeated fragment (n05). One or two wrong letters often destroy the English meaning.
+- No settings change (D-026). Documented as the main limitation for the README.
+
+## Lightweight corrections with existing models, 2026-10-28 (read set = trial set, natural set = check set)
+Rule (set before running): read set CER −1 point or chrF +3 or +2 sentences up a category; natural set not worse;
+ASR max ≲ 2.6 s (read) / ≲ 2.9 s (natural). No word-specific fixes (user rule: no hard-coding for test sentences).
+| Change (`eval_asr.py` flag) | CER | chrF | ASR max | Per sentence | Verdict |
+|---|---|---|---|---|---|
+| Baseline | 8.6 % | 49.3 | 2.08 s | 2 / 3 / 5 | kept |
+| `--anti-repeat` (no_repeat_ngram_size=3, repetition_penalty=1.2) | 17.9 % | 36.6 | 2.13 s | 07 better; 02, 04, 05, 08 worse; 10 stopped early («ես սիրում են։» → "I like it.") | ❌ |
+| `--normalize` (peak-normalise each phrase to 0.9) | 10.2 % | 48.0 | 2.07 s | 05 perfect, 02 better; 07 hallucinated «3-3», 09 «հանդիվումը» → "suit" | ❌ (net ≈ +1 sentence) |
+- Anti-repeat is harmful for Armenian: Whisper writes Armenian with byte-level tokens that naturally repeat inside
+  words, so banning repeated 3-token sequences forces wrong letters and early stops.
+- Conclusion: with the current models the default settings are the best found; variations shuffle which sentences
+  fail. Remaining errors are acoustic (similar consonants, word boundaries, word-initial Բ) → needs a better Armenian
+  ASR model (future work). Live application unchanged; flags kept in `eval_asr.py` for reproducibility only.

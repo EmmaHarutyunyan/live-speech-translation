@@ -238,3 +238,23 @@ Each entry: what was decided, why, what else was considered, status. Newest at t
 - **Not done (decided):** Russian/English words inside Armenian (out of scope; documented); a correction list for
   frequent errors like «Վարև» → «Բարև» (would hide errors; only specific words).
 - **Status:** Verified 2026-10-27.
+
+## D-026 — Translation accuracy: keep current models and settings (2026-10-28)
+- **Question (user):** is the poor English caused by Whisper, NLLB or both, and can it be improved without large new
+  models, without exceeding 5 s?
+- **Answer by measurement (TESTS.md, 2026-10-28):** NLLB gives 10/10 understandable English from correct Armenian;
+  from Whisper's text 2 correct / 3 gist / 5 wrong → mainly Whisper's spelling errors (~19 chrF points lost).
+- **Tried with existing models:** Whisper direct translation (worse, +1 s GPU), Whisper beam 2 (CER 10.2 %, chrF 46.6) and beam 3 (CER 8.6 %, chrF 46.2) — both worse,
+  NLLB beam 4 (chrF 48.7 vs 49.3, same judgement). None met the rule set in advance → **no change**.
+- **Not done (user decision: simplicity, light setup):** downloading/converting an Armenian fine-tuned Whisper or a
+  larger NLLB. Best candidate for future work: Chillarmo/whisper-large-v3-turbo-armenian (would *replace* large-v3,
+  smaller and faster, self-reported CER 2.86 %) — must be measured on our sets first.
+- **Tools added:** `eval/translations.txt`, chrF + `--set`, `--mt-beam`, `--whisper-translate` in `eval_asr.py`,
+  `record_eval.py --set`; `Transcriber.translate_speech()` (test only, unused by the live program).
+- **Natural speech (6 colloquial sentences):** pure Armenian CER ≈ 12 %, English 0 correct / 3 gist / 3 wrong;
+  NLLB from the correct text good on all 6 → same conclusion: Whisper's errors limit the English.
+- **Lightweight corrections (same day):** loudness normalisation (CER 10.2 %, chrF 48.0) and Whisper anti-repeat
+  options (CER 17.9 %, chrF 36.6 — harmful for byte-level Armenian tokens) both rejected by the rule set in advance;
+  word-specific correction lists rejected on principle (would hard-code test words). `Transcriber(decode_options=…)`
+  kept for tests; the live program passes none.
+- **Status:** Decided 2026-10-28.

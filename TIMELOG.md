@@ -1,7 +1,10 @@
 # TIMELOG
 
 Budget from the brief: about 20 hours ("please do not spend much more").
-Hours are active working time as estimated by the user, not wall-clock time.
+**Counting rule (set by the user, 2026-10-28):** only time actively working on the project — coding, testing,
+debugging, writing docs. NOT counted: breaks, waiting (downloads, emails), time away from the computer.
+Start/end are clock times of a work block; "Hours" is the active time within it, confirmed by the user.
+Entries before 2026-10-28 were estimated the same way (breaks excluded) but not timed exactly.
 
 | Date | Start | End | Hours | Milestone | Notes |
 |---|---|---|---|---|---|
@@ -17,5 +20,6 @@ Hours are active working time as estimated by the user, not wall-clock time.
 | 2026-10-27 | 17:40 | 19:25 | ~1.7 | M5 | Speaker ID: option check, SpeechBrain install, 3 recordings with ground truth, short-phrase rule, live L1/L2, docs |
 | 2026-10-27 | 19:25 | 20:00 | ~0.6 | M6 | Echo check, mixed-language check, small fixes, offline mode + download script, docs |
 | 2026-10-27 | 20:00 | 20:20 | ~0.4 | M7 | README (first complete version), download script tested |
+| 2026-10-28 | 13:42 | 15:40 | ~1.3 (estimate, user to confirm) | M6 | Translation accuracy: references + chrF, `--set`, natural set, Whisper translate, beam 2/3, NLLB beam 4, normalize, anti-repeat — none adopted; docs |
 
-**Total so far:** ~11.9 h of ~20 h (≈ 8 h left; target: finish Oct 30, deadline Nov 1 23:59)
+**Total so far:** ~13.2 h of ~20 h (≈ 6.8 h left; target: finish Oct 30, deadline Nov 1 23:59). Earlier entries are upper estimates.

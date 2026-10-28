@@ -1,0 +1,6 @@
+n01	Listen, what time are we meeting today?
+n02	Sorry, I'm running a bit late, I'll be there in ten minutes.
+n03	How did yesterday's meeting go, was everything okay?
+n04	I've already sent the file, take a look when you have time.
+n05	Okay, let's talk again tomorrow morning.
+n06	Our project is almost ready, only the testing is left.

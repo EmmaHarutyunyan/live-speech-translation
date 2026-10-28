@@ -1,0 +1,10 @@
+01	Hi, how are you?
+02	I'm fine, thank you.
+03	Tomorrow I will meet my friends.
+04	Everyone has already returned home.
+05	Today we are testing the new program.
+06	Can you repeat the last sentence?
+07	It was raining yesterday evening.
+08	The doctor will call tomorrow morning.
+09	Our meeting has been moved to next week.
+10	I like to drink coffee before work.

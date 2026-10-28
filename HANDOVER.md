@@ -1,4 +1,4 @@
-# HANDOVER — M5 + fixes + offline done; next: README
+# HANDOVER — translation accuracy in progress (user not yet satisfied)
 
 Updated 2026-10-27 19:25. Everything so far happened in ONE Cowork session (session 01).
 Read this file, then `CLAUDE.md`. Details: `TESTS.md` (all measurements), `DECISIONS.md` (D-001 … D-022),
@@ -9,7 +9,7 @@ Python terminal program: capture microphone + system audio at the same time, tra
 translate to English, print each segment with time, speaker (`Me` / `Speaker 1`, `Speaker 2`, … stable for
 the session), Armenian original and English translation — at most 5 s after the end of a phrase.
 All models local. Deadline: 2026-11-01 23:59 Yerevan time (target: finish Oct 31).
-Budget ~20 h; **~11.9 h used**, ≈ 8 h left.
+Budget ~20 h; **~13.2 h used**, ≈ 6.8 h left.
 
 ## How we work (agreed)
 - The user (junior Python dev, new to ML/audio) wants to understand every decision; explain simply.
@@ -73,19 +73,29 @@ Full application test L2: Me + Speaker 1 + Speaker 2 correct; latency Me 100 %, 
 - Offline: `HF_HUB_OFFLINE=1` in the live program + `scripts/download_models.py`; Wi-Fi-off run passed (D-024).
 - Mixed Armenian/Russian/English checked and documented as a limitation (TESTS.md).
 
-## NEXT — 2026-10-28: translation accuracy (user's priority), capped at ~2.5 h
-Known: NLLB on correct Armenian 10/10 understandable; on Whisper text 2 correct / 3 gist / 5 wrong → mainly Whisper
-spelling errors, but a more robust translator might still help. Keep changes small and measurable; don't break what works.
-0. Baseline: English references for the 10 eval sentences (`eval/translations.txt`, user checks them); add chrF
-   (simple, no new dependency) to `eval_asr.py --translate`. ALSO a small natural-speech set: user records ~6
-   spontaneous/colloquial sentences (incl. 1–2 with Russian/English words), writes down what she said + we agree on
-   English references → same scoring (eval set option `--set natural`, audio git-ignored).
-1. Whisper `task="translate"` (English directly from audio, no new model) — quality + extra GPU time.
-2. NLLB-200 distilled 1.3B (CTranslate2 int8, CPU) on the same Whisper text — quality + CPU time.
-3. At most ONE Armenian fine-tuned Whisper — verify existence, reported results, size, CTranslate2 conversion first.
-Not feasible: SeamlessM4T-size models (VRAM/CPU).
-Decision rule (set 2026-10-27): keep a change only if clearly better English (≥ +2 sentences up a category or clearly
-higher chrF) AND ASR max ≲ 2.5 s, translation max ≲ 1.5 s. Combine options only if the combination is measured too.
+## Done 2026-10-28 (translation accuracy, existing models only) — see TESTS.md + D-026
+- Tools: `eval/translations.txt` (EN references), chrF in `eval_asr.py --translate`, `--set natural`
+  (`eval/sentences_natural.txt`, `eval/translations_natural.txt`, audio `eval/audio/natural/`), `--mt-beam`,
+  `--whisper-translate`, `--normalize`, `--anti-repeat`; `record_eval.py --set`; `Transcriber(decode_options=…)`,
+  `Transcriber.translate_speech()` (tests only).
+- Baselines: read set CER 8.6 %, chrF 49.3, EN 2 correct / 3 gist / 5 wrong; natural set CER 27.2 % (pure Armenian
+  ≈ 12 %), chrF 32.8, EN 0 / 3 / 3. NLLB from correct Armenian: 10/10 and 6/6 understandable → Whisper errors are the cause.
+- ALREADY FAILED — do NOT repeat: Whisper beam 2/3/5, Armenian initial prompt, 300 ms padding, large-v3-turbo,
+  Whisper task="translate", NLLB beam 4, loudness normalisation, no_repeat_ngram_size/repetition_penalty,
+  word-specific correction lists (rejected on principle). New models: user decided NOT to download (keep setup light).
+- Live application unchanged (large-v3 beam 1, NLLB beam 2).
+
+## NEXT — evening 2026-10-28: reduce INCORRECT translations (no new models, no new recordings, keep it simple)
+Idea: we cannot make Whisper hear better, but we can stop showing confident-looking wrong English.
+1. Measure first (no live change): print Whisper's own confidence per phrase (avg_logprob from faster-whisper
+   segments) and NLLB's translation score in `eval_asr.py`; check on the 16 existing sentences whether low
+   confidence matches the wrong translations (correct/gist/wrong judgements are in TESTS.md).
+2. Only if it separates them reasonably: mark low-confidence lines in the live output (e.g. "EN (uncertain): …"),
+   threshold chosen on the read set and checked on the natural set. Zero extra latency (values already computed).
+3. Optional, only if 1–2 are not enough: a back-translation check (EN → HY with the same NLLB, compare with the
+   Whisper text) — costs ~0.4 s CPU; measure before adopting.
+Rule: adopt only if it flags most wrong translations while flagging few correct ones, with no latency increase
+beyond ~0.4 s; document either way.
 
 ## Then
 - Real call (Meet/Zoom) with 2 helpers (~10 min) — date to be set; fresh install in a new folder; rehearsal;

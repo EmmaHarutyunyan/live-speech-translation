@@ -23,13 +23,19 @@ sys.path.insert(0, str(PROJECT_DIR))
 
 from hylive.audio_capture import SAMPLE_WIDTH_BYTES, DeviceCapture, default_mic, get_device  # noqa: E402
 
-SENTENCES_FILE = PROJECT_DIR / "eval" / "sentences.txt"
-AUDIO_DIR = PROJECT_DIR / "eval" / "audio"
+EVAL_DIR = PROJECT_DIR / "eval"
+
+
+def set_paths(name: str) -> tuple[Path, Path]:
+    """'main' = the original 10 sentences; other sets: eval/sentences_<name>.txt + eval/audio/<name>/."""
+    if name == "main":
+        return EVAL_DIR / "sentences.txt", EVAL_DIR / "audio"
+    return EVAL_DIR / f"sentences_{name}.txt", EVAL_DIR / "audio" / name
 QUIET_PEAK = 0.02  # below this the recording is probably too quiet (laptop mic speech was ~0.14)
 
 
-def load_sentences() -> list[tuple[str, str]]:
-    lines = SENTENCES_FILE.read_text(encoding="utf-8").splitlines()
+def load_sentences(sentences_file: Path) -> list[tuple[str, str]]:
+    lines = sentences_file.read_text(encoding="utf-8").splitlines()
     return [tuple(line.split("\t", 1)) for line in lines if line.strip()]
 
 
@@ -38,9 +44,11 @@ def main() -> None:
     parser.add_argument("--mic", type=int)
     parser.add_argument("--seconds", type=float, default=6.0)
     parser.add_argument("--only", help="record only this sentence id, e.g. 03")
+    parser.add_argument("--set", default="main", help="sentence set: main (default) or e.g. natural")
     args = parser.parse_args()
+    SENTENCES_FILE, AUDIO_DIR = set_paths(args.set)
 
-    sentences = load_sentences()
+    sentences = load_sentences(SENTENCES_FILE)
     if args.only:
         sentences = [s for s in sentences if s[0] == args.only]
         if not sentences:
@@ -61,7 +69,7 @@ def main() -> None:
             data = b"".join(chunks.get().data for _ in range(chunks.qsize()))
             peak = float(np.abs(np.frombuffer(data, dtype=np.int16)).max()) / 32768 if data else 0.0
 
-            path = AUDIO_DIR / f"eval{sid}.wav"
+            path = AUDIO_DIR / f"eval{sid}.wav"  # noqa: F821 (AUDIO_DIR set in main)
             with wave.open(str(path), "wb") as wav:
                 wav.setnchannels(mic.channels)
                 wav.setsampwidth(SAMPLE_WIDTH_BYTES)

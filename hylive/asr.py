@@ -43,9 +43,11 @@ class AsrResult:
 
 
 class Transcriber:
-    def __init__(self, model_name: str = "small", beam_size: int = 1, initial_prompt: str | None = None):
+    def __init__(self, model_name: str = "small", beam_size: int = 1, initial_prompt: str | None = None,
+                 decode_options: dict | None = None):
         self.model_name = model_name
         self.beam_size = beam_size
+        self.decode_options = decode_options or {}  # extra faster-whisper options, used only by tests so far
         self.initial_prompt = initial_prompt  # optional Armenian text given to Whisper as context (M3 test)
         self.model = WhisperModel(model_name, device="cuda", compute_type=COMPUTE_TYPE,
                                   download_root=str(MODELS_DIR))
@@ -56,6 +58,14 @@ class Transcriber:
 
     def transcribe(self, audio: np.ndarray) -> str:
         return self.transcribe_full(audio).text
+
+    def translate_speech(self, audio: np.ndarray) -> str:
+        """English directly from Armenian speech (Whisper's own "translate" task). Test only (translation step 1)."""
+        segments, _info = self.model.transcribe(
+            audio, language="hy", task="translate", beam_size=self.beam_size, temperature=0.0,
+            vad_filter=False, condition_on_previous_text=False, without_timestamps=True,
+            max_new_tokens=MAX_NEW_TOKENS)
+        return " ".join(s.text.strip() for s in segments).strip()
 
     def transcribe_full(self, audio: np.ndarray) -> AsrResult:
         segments, _info = self.model.transcribe(
@@ -69,6 +79,7 @@ class Transcriber:
             without_timestamps=True,            # we only need the text
             initial_prompt=self.initial_prompt,
             max_new_tokens=MAX_NEW_TOKENS,
+            **self.decode_options,
         )
         segments = list(segments)  # decoding runs while the segments are read
         return AsrResult(
