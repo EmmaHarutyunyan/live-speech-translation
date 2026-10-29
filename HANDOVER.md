@@ -1,4 +1,4 @@
-# HANDOVER — translation accuracy in progress (user not yet satisfied)
+# HANDOVER — submission phase (strict 20 h limit)
 
 Updated 2026-10-27 19:25. Everything so far happened in ONE Cowork session (session 01).
 Read this file, then `CLAUDE.md`. Details: `TESTS.md` (all measurements), `DECISIONS.md` (D-001 … D-022),
@@ -85,17 +85,26 @@ Full application test L2: Me + Speaker 1 + Speaker 2 correct; latency Me 100 %, 
   word-specific correction lists (rejected on principle). New models: user decided NOT to download (keep setup light).
 - Live application unchanged (large-v3 beam 1, NLLB beam 2).
 
-## NEXT — evening 2026-10-28: reduce INCORRECT translations (no new models, no new recordings, keep it simple)
-Idea: we cannot make Whisper hear better, but we can stop showing confident-looking wrong English.
-1. Measure first (no live change): print Whisper's own confidence per phrase (avg_logprob from faster-whisper
-   segments) and NLLB's translation score in `eval_asr.py`; check on the 16 existing sentences whether low
-   confidence matches the wrong translations (correct/gist/wrong judgements are in TESTS.md).
-2. Only if it separates them reasonably: mark low-confidence lines in the live output (e.g. "EN (uncertain): …"),
-   threshold chosen on the read set and checked on the natural set. Zero extra latency (values already computed).
-3. Optional, only if 1–2 are not enough: a back-translation check (EN → HY with the same NLLB, compare with the
-   Whisper text) — costs ~0.4 s CPU; measure before adopting.
-Rule: adopt only if it flags most wrong translations while flagging few correct ones, with no latency increase
-beyond ~0.4 s; document either way.
+## Done 2026-10-29/30
+- **ASR default switched to the Armenian fine-tuned Whisper turbo** (D-027): read CER 8.6 → 1.9 %, EN 2 → 9 of 10
+  correct; natural and fresh check sets also clearly better; ASR ~2× faster. + punctuation cleanup.
+- `scripts/download_models.py` now does the whole model setup (downloads + both conversions); tested OK.
+- Live mic test: 6/6 ≤ 5 s, median 1.9 s. Zoom (1 helper): 100 % ≤ 5 s on both sources, 0 audio problems, but
+  ECHO from the headset (≈ 6 of 14 "Me" blocks are the helper's words) and possibly one false "Speaker 2".
+
+## NEXT (2026-10-30) — STRICT 20 h LIMIT: only essentials, in this order
+0. Ask the user for today's/yesterday's active minutes (TIMELOG: no guessing).
+1. Echo — decide quickly (it makes wrong "Me" blocks in the interview):
+   a) earphones WITHOUT a mic (2-ring plug) → laptop mic is used, far from the earbuds; no code; re-test 1 min; or
+   b) simple echo filter (~30 min): drop/mark a "Me" phrase that overlaps in time with a call-side phrase and has
+      nearly the same text; measure once on a Zoom run; document either way.
+2. 3-person Zoom test (user + 2 helpers, ~10 min): labels stable, latency, queue, stability (RAM start/end).
+3. README update: new default model + reasons and numbers, one-script setup (`download_models.py` replaces the
+   separate converter command), Zoom audio setup, Zoom results, echo limitation, updated test tables; PLAN.md status.
+4. Commit + push (check: no audio/model files).
+5. Chat export → one .md per session in `chats/` (unedited) + `chats/INDEX.md`; commit + push.
+6. Repo visibility (still unclear from Mathrix: public or collaborators) → send the link. Deadline Nov 1 23:59.
+Skip unless time is left: fresh install in a new folder, cosmetic fixes ("(nothing recognised)" blocks, missed loops).
 
 ## Then
 - Real call (Meet/Zoom) with 2 helpers (~10 min) — date to be set; fresh install in a new folder; rehearsal;

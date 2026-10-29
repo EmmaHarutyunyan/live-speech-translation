@@ -287,3 +287,32 @@ ASR max ≲ 2.6 s (read) / ≲ 2.9 s (natural). No word-specific fixes (user rul
 - Conclusion: with the current models the default settings are the best found; variations shuffle which sentences
   fail. Remaining errors are acoustic (similar consonants, word boundaries, word-initial Բ) → needs a better Armenian
   ASR model (future work). Live application unchanged; flags kept in `eval_asr.py` for reproducibility only.
+
+## Armenian fine-tuned Whisper turbo (2026-10-29) — adopted (D-027)
+Same recordings, same pipeline, only the ASR model changed (`eval_asr.py --model models\whisper-turbo-armenian-ct2`).
+| Set | Model | CER | chrF (EN shown) | Judgement correct/gist/wrong | ASR avg / max |
+|---|---|---|---|---|---|
+| read (10) | large-v3 | 8.6 % | 49.3 | 2 / 3 / 5 | 1.77 / 2.08 s |
+| read (10) | turbo-armenian | 1.9 % | 61.7 | 9 / 1 / 0 | 1.01 / 1.70 s |
+| natural (6) | large-v3 | 27.2 % | 32.8 | 0 / 3 / 3 | 2.22 / 2.63 s |
+| natural (6) | turbo-armenian | 20.6 % | 49.5 | 2 / 2 / 2 | 1.13 / 1.68 s |
+| check (5, recorded fresh for this comparison) | large-v3 | 11.6 % | 38.7 | 0 / 2 / 3 | 2.45 / 2.87 s |
+| check (5) | turbo-armenian | 5.6 % | 48.8 | 2 / 2 / 1 | 1.46 / 1.78 s |
+- + punctuation cleanup (dialog dashes, "…", "՞՞"): chrF check 48.8 → 57.7, read 61.7 → 62.6, natural 49.5 → 50.9;
+  c03 «Չեմ հասկանում… - Կարո՞՞ւ ես…» now → "I don't understand. Can you speak a little slowly?". Kept.
+- Remaining errors: թ/տ («կատ» → "goats"), «Երեք» for «Երեկ», Russian words (n05), occasional repeated fragment.
+- Live mic test with the new default (2026-10-29): 6/6 ≤ 5 s, median 1.9 s, max 2.5 s (was ~3 s with large-v3).
+- `download_models.py` (now also converts both models) ran successfully: 4/4 steps, "done".
+
+## Zoom tests (2026-10-29/30, Zoom desktop, speaker/mic = Windows default, headset 3-ring cable mic)
+| Run | Setup | Me ≤ 5 s | Call side ≤ 5 s | Speakers | Problems |
+|---|---|---|---|---|---|
+| Z1 | 1 helper, normal volume | 9/9 (median 2.5 s, max 4.4 s) | 5/5 (median 3.0 s, max 4.0 s) | 1 (correct) | ECHO: "Me" blocks mirror the helper (00:00:03, 00:00:16); 1 loop not caught («համարտական …») |
+| Z2 | 1 helper, Zoom volume ~30–40 %, user speaking too | 14/14 (median 2.2 s, max 3.1 s) | 8/8 (median 2.9 s, max 5.0 s) | 2 — one extra "Speaker 2" (00:00:28, short phrase, similarity 0.27) if only one helper was present | ECHO still: ~6 of 14 "Me" blocks are the helper's words at the same timestamps |
+All Zoom runs: 0 PortAudio problem flags, detected = printed, queue 0–1.
+- Recognition through Zoom mostly good, e.g. helper: "Can you meet me tonight?", "I'd like to try a new place.",
+  "They met on the Republic Square."; user: "A new cafe has opened in the center.", "I'll call you tomorrow to confirm."
+- R4-1 is NOT met with this headset in Zoom: the earbuds leak the call into the cable mic even at lower volume
+  (the YouTube echo check on 2026-10-27 had passed). Options: earphones WITHOUT a mic (laptop mic is used, far from
+  the earbuds) — no code; or a simple echo filter (drop a "Me" phrase that overlaps in time with a call-side phrase
+  and has nearly the same text). 3-person Zoom test still to do.

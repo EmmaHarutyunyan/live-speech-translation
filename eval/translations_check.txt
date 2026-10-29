@@ -1,0 +1,5 @@
+c01	Okay, then I'll call you tomorrow at ten.
+c02	The weather is very nice today, let's go out for a walk.
+c03	I don't understand, can you speak a little slower?
+c04	My mom asked me to buy bread and milk.
+c05	We watched the film yesterday, but I didn't like the ending at all.

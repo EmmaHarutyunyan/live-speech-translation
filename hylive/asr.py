@@ -4,6 +4,7 @@ Input:  one phrase as 16 kHz mono float32 audio (a Segment's audio).
 Output: Armenian text (`transcribe`) or text + reliability information (`transcribe_full`).
 """
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -15,6 +16,10 @@ register_nvidia_dlls()
 from faster_whisper import WhisperModel  # noqa: E402  (must be imported after the DLL registration)
 
 MODELS_DIR = Path(__file__).resolve().parent.parent / "models"  # git-ignored
+# Default since 2026-10-29: Armenian fine-tuned Whisper large-v3-turbo, converted to CTranslate2 int8 by
+# scripts/download_models.py (D-027). "large-v3" stays available as a fallback (--asr-model large-v3).
+DEFAULT_MODEL_DIR = MODELS_DIR / "whisper-turbo-armenian-ct2"
+DEFAULT_MODEL = str(DEFAULT_MODEL_DIR)
 COMPUTE_TYPE = "int8_float32"  # the int8 type CTranslate2 supports on the GTX 1060 (D-002)
 # Bounds against repetition loops ("այդ այդ այդ ..."), which took 7-8 s each and blocked the queue (D-020).
 MAX_NEW_TOKENS = 128            # far more than 5 s of normal speech needs; a loop stops here
@@ -22,6 +27,15 @@ MAX_COMPRESSION_RATIO = 2.4     # Whisper's own threshold: above it, the text is
 # Loops the compression ratio missed («… այդ համար այդ համար …», 2026-10-27): long text made of few different words.
 MIN_WORDS_FOR_LOOP_CHECK = 8
 MIN_UNIQUE_WORD_RATIO = 0.4
+
+
+def clean_punctuation(text: str) -> str:
+    """Remove subtitle-style punctuation that the Armenian turbo model often adds and that confuses NLLB:
+    dialog dashes ("- Text", "… - Text"), ellipses, doubled question marks. Hyphens inside words are kept (D-027)."""
+    text = re.sub(r"(?:^|(?<=\s))[-–—]\s+", "", text)  # dash + space at the start or after a space
+    text = text.replace("…", ".")
+    text = re.sub(r"՞{2,}", "՞", text)
+    return re.sub(r"\s+", " ", text).strip()
 
 
 @dataclass(frozen=True)
@@ -43,8 +57,10 @@ class AsrResult:
 
 
 class Transcriber:
-    def __init__(self, model_name: str = "small", beam_size: int = 1, initial_prompt: str | None = None,
+    def __init__(self, model_name: str = DEFAULT_MODEL, beam_size: int = 1, initial_prompt: str | None = None,
                  decode_options: dict | None = None):
+        if ("/" in model_name or "\\" in model_name) and not Path(model_name).exists() and model_name.count("/") != 1:
+            raise FileNotFoundError(f"ASR model folder not found: {model_name}. Run scripts/download_models.py first.")
         self.model_name = model_name
         self.beam_size = beam_size
         self.decode_options = decode_options or {}  # extra faster-whisper options, used only by tests so far
@@ -84,7 +100,7 @@ class Transcriber:
         segments = list(segments)  # decoding runs while the segments are read
         return AsrResult(
             # "\ufffd" = half an Armenian character when a phrase is cut in the middle of a word (5 s limit)
-            text=" ".join(s.text.strip() for s in segments).replace("\ufffd", "").strip(),
+            text=clean_punctuation(" ".join(s.text.strip() for s in segments).replace("\ufffd", "")),
             compression_ratio=max((s.compression_ratio for s in segments), default=0.0),
             hit_token_limit=sum(len(s.tokens) for s in segments) >= MAX_NEW_TOKENS - 2,  # approximate
         )

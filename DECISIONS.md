@@ -258,3 +258,18 @@ Each entry: what was decided, why, what else was considered, status. Newest at t
   word-specific correction lists rejected on principle (would hard-code test words). `Transcriber(decode_options=…)`
   kept for tests; the live program passes none.
 - **Status:** Decided 2026-10-28.
+
+## D-027 — Default ASR model: Armenian fine-tuned Whisper large-v3-turbo + punctuation cleanup (2026-10-29)
+- **Decision:** `Chillarmo/whisper-large-v3-turbo-armenian` (Apache-2.0; fine-tuned on Common Voice Armenian),
+  converted to CTranslate2 int8 into `models/whisper-turbo-armenian-ct2`, is the default (`--asr-model`).
+  large-v3 stays available as a fallback (`download_models.py --with-large-v3`, `--asr-model large-v3`).
+  New `clean_punctuation()` removes the model's subtitle-style dialog dashes, "…" and doubled "՞" before translation.
+- **Why:** the only change that clearly improved accuracy (12 setting variations of large-v3 did not). Rule set in
+  advance (CER ≥ 2 points better on read AND natural sets, English clearly better, ASR not slower) met on all three
+  sets, incl. 5 sentences recorded fresh for this comparison (TESTS.md). ASR ~2× faster (≈1.0–1.5 s per phrase).
+  It replaces large-v3, so the reviewer downloads less (~1.6 GB instead of ~3 GB); no new dependency.
+- **Setup simplified:** `scripts/download_models.py` now downloads and converts both models itself
+  (`ctranslate2.converters.TransformersConverter`), so setup = `pip install -r requirements.txt` + this one script.
+- **Earlier decision revised:** D-026 (no new models) was the user's simplicity choice; reopened on 2026-10-29 because
+  accuracy was the top concern and this model replaces rather than adds.
+- **Status:** Verified 2026-10-29.

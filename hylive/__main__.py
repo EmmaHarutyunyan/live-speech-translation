@@ -24,6 +24,7 @@ import os
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 
 import argparse  # noqa: E402
+from pathlib import Path  # noqa: E402
 import queue  # noqa: E402
 import threading  # noqa: E402
 import time  # noqa: E402
@@ -32,7 +33,7 @@ import warnings  # noqa: E402
 # Harmless warning printed by silero-vad's model loader on every start (D-014); hidden so the live output stays readable.
 warnings.filterwarnings("ignore", message=r"`torch\.jit\.load` is deprecated", category=FutureWarning)
 
-from hylive.asr import Transcriber  # imported first: registers the NVIDIA DLLs (D-008)
+from hylive.asr import DEFAULT_MODEL, Transcriber  # imported first: registers the NVIDIA DLLs (D-008)
 from hylive.translate import Translator
 
 import numpy as np  # noqa: E402
@@ -162,7 +163,9 @@ def main() -> None:
     parser.add_argument("--list-devices", action="store_true", help="print recordable devices and exit")
     parser.add_argument("--mic", type=int, help="microphone device index (default: Windows default mic)")
     parser.add_argument("--system", type=int, help="loopback device index (default: loopback of the default speakers)")
-    parser.add_argument("--asr-model", default="large-v3", help="faster-whisper model (default large-v3, D-015)")
+    parser.add_argument("--asr-model", default=DEFAULT_MODEL,
+                        help="Whisper model: default = Armenian fine-tuned turbo in models/ (D-027); "
+                             "fallback: large-v3 (needs scripts/download_models.py --with-large-v3)")
     parser.add_argument("--min-silence-ms", type=int, default=500)
     parser.add_argument("--max-segment-s", type=float, default=5.0,
                         help="cut phrases longer than this (default 5 s: longer phrases broke the 5 s latency, D-020)")
@@ -206,7 +209,7 @@ def main() -> None:
         print("loading VAD (one model per source: the model keeps internal state) ...", flush=True)
         segmenters = {s: Segmenter(s, load_vad_model(), min_silence_ms=args.min_silence_ms,
                                    max_segment_s=args.max_segment_s) for s in sources}
-        print(f"loading Whisper '{args.asr_model}' on GPU ...", flush=True)
+        print(f"loading Whisper '{Path(args.asr_model).name}' on GPU ...", flush=True)
         transcriber = Transcriber(args.asr_model)
         transcriber.warm_up()
         print("loading NLLB translation on CPU ...", flush=True)
