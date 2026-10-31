@@ -273,3 +273,13 @@ Each entry: what was decided, why, what else was considered, status. Newest at t
 - **Earlier decision revised:** D-026 (no new models) was the user's simplicity choice; reopened on 2026-10-29 because
   accuracy was the top concern and this model replaces rather than adds.
 - **Status:** Verified 2026-10-29.
+
+## D-028 — Whisper beam 5 with the turbo-armenian model (2026-10-31)
+- **Decision:** live default `--asr-beam 5` (was 1). `--asr-beam 1` restores the old behaviour.
+- **Why:** on large-v3, beam 5 was the only setting that lowered CER but was too slow (D-018). turbo-armenian is ~2×
+  faster, so beam 5 now costs almost nothing (ASR max 1.89 s vs 1.80 s). Better or equal on all three test sets
+  (read CER 1.9 → 1.3 %, natural 20.6 → 19.5 %, check unchanged; WER also lower).
+- **Honest note:** the combined improvement (9.25 → 8.64 % CER) is below the 1-point threshold set before the test.
+  Adopted anyway because no set got worse and there is no latency cost; recorded as an exception to the rule.
+- **Rejected in the same run:** 800 ms end-of-phrase silence (no gain). Accuracy work stopped here (time limit).
+- **Status:** Verified 2026-10-31 (live mic: 8/8 ≤ 5 s, median 2.1 s).

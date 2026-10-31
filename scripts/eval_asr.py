@@ -88,11 +88,11 @@ def edit_distance(a, b) -> int:
     return previous[-1]
 
 
-def phrases_from_wav(path: Path, vad_model, pad_ms: int) -> list:
+def phrases_from_wav(path: Path, vad_model, pad_ms: int, min_silence_ms: int = 500) -> list:
     with wave.open(str(path), "rb") as wav:
         channels, rate = wav.getnchannels(), wav.getframerate()
         frames = to_float32_frames(wav.readframes(wav.getnframes()), channels)
-    segmenter = Segmenter("mic", vad_model, speech_pad_ms=pad_ms)
+    segmenter = Segmenter("mic", vad_model, speech_pad_ms=pad_ms, min_silence_ms=min_silence_ms)
     resampler = Resampler(rate)
     block = int(rate * BLOCK_SECONDS)
     starts = range(0, len(frames), block)
@@ -109,6 +109,7 @@ def main() -> None:
     parser.add_argument("--beam-size", type=int, default=1)
     parser.add_argument("--prompt", action="store_true", help=f"use initial_prompt: {PROMPT}")
     parser.add_argument("--pad-ms", type=int, default=100, help="VAD speech padding before/after each phrase")
+    parser.add_argument("--min-silence-ms", type=int, default=500, help="pause that ends a phrase (live default 500)")
     parser.add_argument("--translate", action="store_true", help="also translate reference and ASR text with NLLB (M4)")
     parser.add_argument("--set", default="main", help="sentence set: main (default) or e.g. natural")
     parser.add_argument("--mt-beam", type=int, default=2, help="NLLB beam size (live default 2)")
@@ -140,16 +141,18 @@ def main() -> None:
         translator = Translator(beam_size=args.mt_beam)
         translator.translate("Բարև")  # warm-up
     setting = (f"set {args.set}, model {args.model}, beam {args.beam_size}, prompt {'on' if args.prompt else 'off'}, "
-               f"pad {args.pad_ms} ms, NLLB beam {args.mt_beam}, normalize {'on' if args.normalize else 'off'}, "
+               f"pad {args.pad_ms} ms, silence {args.min_silence_ms} ms, NLLB beam {args.mt_beam}, "
+               f"normalize {'on' if args.normalize else 'off'}, "
                f"anti-repeat {'on' if args.anti_repeat else 'off'}")
     print(f"\nSetting: {setting}\n")
 
     total_edits = total_chars = 0
+    total_word_edits = total_words = 0
     times, mt_times = [], []
     chrf_asr, chrf_upper = [], []  # English from the ASR text / from the correct Armenian, both vs. the English reference
     chrf_whisper, whisper_times = [], []  # English directly from the audio (Whisper task="translate")
     for sid, reference in sentences:
-        segments = phrases_from_wav(AUDIO_DIR / f"eval{sid}.wav", vad_model, args.pad_ms)
+        segments = phrases_from_wav(AUDIO_DIR / f"eval{sid}.wav", vad_model, args.pad_ms, args.min_silence_ms)
         if args.normalize:  # same phrase, louder: peak at 0.9 (the mic peaks at only ~0.1-0.3)
             segments = [replace(s, audio=s.audio * (0.9 / max(float(abs(s.audio).max()), 1e-6))) for s in segments]
         t0 = time.perf_counter()
@@ -159,6 +162,8 @@ def main() -> None:
         edits = edit_distance(ref, hyp)
         total_edits += edits
         total_chars += len(ref)
+        total_word_edits += edit_distance(ref.split(), hyp.split())
+        total_words += len(ref.split())
         print(f"[{sid}] CER {100 * edits / len(ref):5.1f} %  {times[-1]:.2f} s  {len(segments)} phrase(s)")
         print(f"     ref: {reference}")
         print(f"     hyp: {hypothesis or '(nothing recognised)'}")
@@ -181,7 +186,8 @@ def main() -> None:
                 print(f"     EN Whisper translate:  {en_whisper}   (chrF {chrf([chrf_whisper[-1]]):.0f}, "
                       f"{whisper_times[-1]:.2f} s extra GPU)")
 
-    print(f"\nRESULT ({setting}): CER {100 * total_edits / total_chars:.1f} % over {len(sentences)} sentences, "
+    print(f"\nRESULT ({setting}): CER {100 * total_edits / total_chars:.1f} %, "
+          f"WER {100 * total_word_edits / total_words:.1f} % over {len(sentences)} sentences, "
           f"ASR time avg {sum(times) / len(times):.2f} s, max {max(times):.2f} s")
     if translator is not None:
         print(f"TRANSLATION: chrF from ASR text {chrf(chrf_asr):.1f} | chrF from correct Armenian {chrf(chrf_upper):.1f} "

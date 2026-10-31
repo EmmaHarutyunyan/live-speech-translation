@@ -166,6 +166,8 @@ def main() -> None:
     parser.add_argument("--asr-model", default=DEFAULT_MODEL,
                         help="Whisper model: default = Armenian fine-tuned turbo in models/ (D-027); "
                              "fallback: large-v3 (needs scripts/download_models.py --with-large-v3)")
+    parser.add_argument("--asr-beam", type=int, default=5,
+                        help="Whisper beam size (default 5: better on all test sets, no extra latency with turbo, D-028)")
     parser.add_argument("--min-silence-ms", type=int, default=500)
     parser.add_argument("--max-segment-s", type=float, default=5.0,
                         help="cut phrases longer than this (default 5 s: longer phrases broke the 5 s latency, D-020)")
@@ -209,8 +211,8 @@ def main() -> None:
         print("loading VAD (one model per source: the model keeps internal state) ...", flush=True)
         segmenters = {s: Segmenter(s, load_vad_model(), min_silence_ms=args.min_silence_ms,
                                    max_segment_s=args.max_segment_s) for s in sources}
-        print(f"loading Whisper '{Path(args.asr_model).name}' on GPU ...", flush=True)
-        transcriber = Transcriber(args.asr_model)
+        print(f"loading Whisper '{Path(args.asr_model).name}' (beam {args.asr_beam}) on GPU ...", flush=True)
+        transcriber = Transcriber(args.asr_model, beam_size=args.asr_beam)
         transcriber.warm_up()
         print("loading NLLB translation on CPU ...", flush=True)
         translator = Translator()

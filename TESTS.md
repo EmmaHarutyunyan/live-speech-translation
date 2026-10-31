@@ -316,3 +316,17 @@ All Zoom runs: 0 PortAudio problem flags, detected = printed, queue 0–1.
   (the YouTube echo check on 2026-10-27 had passed). Options: earphones WITHOUT a mic (laptop mic is used, far from
   the earbuds) — no code; or a simple echo filter (drop a "Me" phrase that overlaps in time with a call-side phrase
   and has nearly the same text). 3-person Zoom test still to do.
+
+## Final ASR tuning on turbo-armenian (2026-10-31, 1 h block; ASR only, existing recordings; CER/WER after normalisation)
+| Setting | read CER / WER | natural CER / WER | check CER / WER | all 21: CER / WER | ASR max |
+|---|---|---|---|---|---|
+| beam 1, silence 500 ms (previous default) | 1.9 / 10.2 % | 20.6 / 37.0 % | 5.6 / 17.5 % | 9.25 / 21.5 % | 1.80 s |
+| **beam 5** | **1.3 / 8.2 %** | **19.5 / 37.0 %** | 5.6 / 17.5 % | **8.64 / 20.8 %** | 1.89 s |
+| beam 1, silence 800 ms | 1.9 / 10.2 % | 20.6 / 37.0 % | 6.0 / 20.0 % | 9.36 / 22.2 % | 1.12 s |
+- Beam 5: better or equal on every set, never worse; no meaningful latency cost on turbo. Combined CER gain 0.6 points
+  is BELOW the 1-point threshold set before the run → adopted as a documented exception (D-028).
+- 800 ms silence: no gain (check set slightly worse) → rejected.
+- Live check with beam 5 (mic only, 2026-10-31): run 2: 8/8 ≤ 5 s, median 2.1 s, max 2.7 s, ASR ~1.0 s; English
+  correct for most sentences ("I was busy all day today.", "And we decided to meet next week."). Run 1 (short test
+  words): «Խոս ափող» → "coast" (word split) and a repetition loop the filter missed («այդ համարվում է, …»: 50 %
+  different words, filter threshold < 40 %) — documented limitation, filter not tightened (no time to test safely).
