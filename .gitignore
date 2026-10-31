@@ -39,3 +39,6 @@ logs/
 *.log
 .idea/
 .vscode/
+
+# Claude data export (private download links, raw ZIPs) - never commit
+chats/export/

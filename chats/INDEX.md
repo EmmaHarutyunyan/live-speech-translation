@@ -14,4 +14,4 @@ for the interview — never delete or edit any session.
 ## Sessions
 | # | Started | Session name in app | Topic | Export file | Status |
 |---|---|---|---|---|---|
-| 01 | 2026-10-21 | main project session (the only session; used 2026-10-21 … 2026-10-31) | Whole project: requirements, plan, environment, all milestones, tests, documentation, submission | `01-live-armenian-translation.md` | export requested 2026-10-31 18:20 (Claude data export, still processing); will be added unedited as soon as it arrives |
+| 01 | 2026-10-21 | main project session (the only session; used 2026-10-21 … 2026-10-31) | Whole project: requirements, plan, environment, all milestones, tests, documentation, submission | `01-live-armenian-translation.md` | exported 2026-10-31 (official Claude data export, converted unchanged by `scripts/export_challenge_chat.py`); all 369 messages, 2026-10-21 18:32 … 2026-10-31 18:12 Yerevan time. Messages after 2026-10-31 18:12 (export handling, final commit) are not included because the export was created at 18:19 |
