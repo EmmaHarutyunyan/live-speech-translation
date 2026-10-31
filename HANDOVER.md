@@ -1,144 +1,38 @@
-# HANDOVER — submission phase (strict 20 h limit)
+# HANDOVER — final day (2026-10-31)
 
-Updated 2026-10-27 19:25. Everything so far happened in ONE Cowork session (session 01).
-Read this file, then `CLAUDE.md`. Details: `TESTS.md` (all measurements), `DECISIONS.md` (D-001 … D-022),
-`TIMELOG.md`. The official Mathrix brief is the source of truth. Target: finish by Oct 30.
-
-## Goal (from the brief)
-Python terminal program: capture microphone + system audio at the same time, transcribe spoken Armenian,
-translate to English, print each segment with time, speaker (`Me` / `Speaker 1`, `Speaker 2`, … stable for
-the session), Armenian original and English translation — at most 5 s after the end of a phrase.
-All models local. Deadline: 2026-11-01 23:59 Yerevan time (target: finish Oct 31).
-Budget ~20 h; **~13.2 h used**, ≈ 6.8 h left.
+Read this file, then `CLAUDE.md`. Details: `TESTS.md` (all measurements), `DECISIONS.md` (D-001 … D-028),
+`TIMELOG.md`. The official Mathrix brief is the source of truth. Deadline: 2026-11-01 23:59 Yerevan time
+(target: submit 2026-10-31). Strict 20 h limit: 3.5 h were left at 16:45 on 2026-10-31.
 
 ## How we work (agreed)
-- The user (junior Python dev, new to ML/audio) wants to understand every decision; explain simply.
-- One step at a time; ask before installing anything, changing files or making major changes.
-- Claude can only write files in `D:\Em\mathrix` (it cannot run Windows commands). The user runs every
-  command in a normal (non-admin) PowerShell from `D:\Em\mathrix` and pastes the output.
-- Always use the venv Python directly: `.\.venv\Scripts\python.exe ...` (no activation — avoids changing
-  the PowerShell execution policy).
-- Verify library facts in official docs/PyPI before relying on them; cite sources.
-- Never paste secrets/tokens into chats (chats are submitted unedited).
+- Explain simply; one step at a time; ask before installing anything, changing files or deleting.
+- The user runs every command in a normal PowerShell from `D:\Em\mathrix` with `.\.venv\Scripts\python.exe`.
+- Verify facts before relying on them; measure with rules set in advance; no hardcoded fixes for test sentences.
+- Never paste secrets into chats (chats are submitted unedited). Track only active time; never guess.
 
-## Environment (verified)
-Windows 11 Home (build 26200) · i5-8300H 4C/8T · 7.9 GB RAM · GTX 1060 3 GB (Pascal, compute capability 6.1),
-driver 582.28 (do not update — D-005) · Python 3.12.1 via `py -3.12` · Git 2.44 · venv at `D:\Em\mathrix\.venv`
-· C: 26.6 GB free, D: 397 GB free · audio endpoints: `Микрофон (Realtek(R) Audio)`, `Динамики (Realtek(R) Audio)`
-· Armenian text displays correctly in PowerShell · VS Code has no Copilot extension.
-Installed in venv (pinned in `requirements.txt`): faster-whisper 1.2.1, ctranslate2 4.8.3,
-nvidia-cublas-cu12 12.9.2.10, nvidia-cudnn-cu12 9.27.0.42, onnxruntime 1.31.0, numpy 2.5.4,
-PyAudioWPatch 0.2.12.9, soxr 1.1.0,
-silero-vad 6.2.3, torch 2.14.1+cpu, transformers. Models in `models/`: faster-whisper small,
-medium, large-v3; NLLB converted to `models/nllb-200-distilled-600M-ct2-int8`.
+## Current state — feature complete, final live test done
+- Program: `.\.venv\Scripts\python.exe -m hylive` (mic 9 + loopback 10 = Windows defaults on this laptop).
+- Defaults: Armenian fine-tuned Whisper turbo (`models/whisper-turbo-armenian-ct2`, CTranslate2 int8, GPU, beam 5,
+  D-027/D-028) → NLLB-200 600M (CPU int8, beam 2) → SpeechBrain ECAPA speaker labels (threshold 0.35, D-023).
+  Phrases end after 500 ms silence, cut at 5 s. Offline (`HF_HUB_OFFLINE=1`, D-024).
+- Setup: `pip install -r requirements.txt` + `scripts/download_models.py` (tested). README rewritten 2026-10-31.
+- Models kept locally (git-ignored): turbo-armenian, large-v3 (fallback), tiny (GPU smoke test), NLLB ct2 + tokenizer,
+  speaker model. Removed 2026-10-31: small, medium, plain turbo, `models/hf_home` (unused).
+- Final 3-person Zoom test (TESTS.md): 33/33 phrases ≤ 5 s (max 4.1 s), 2 speakers correct, 0 audio problems;
+  ECHO: 13 of 22 "Me" blocks were the friends' words (headset cable mic). User decision: no code fix (untested,
+  would add latency) → documented limitation; for the interview use earphones without a microphone.
 
-## Where we are
-- M0 setup ✅ · M1 audio capture ✅ · M2 live skeleton ✅ · M3 ASR settings ✅ · M4 translation ✅ ·
-  system audio + much of M6 latency work ✅ · **M5 speaker identification ✅** · small fixes ✅ · offline check ✅ · README ✅ (first version, reviewed by user: pending) · fresh-setup check ☐ · real call ☐ · rehearsal ☐
-- Live program: `.\.venv\Scripts\python.exe -m hylive [--list-devices] [--mic N] [--system N] [--sources mic|system|mic,system]
-  [--asr-model large-v3] [--min-silence-ms 500] [--max-segment-s 5] [--speaker-threshold 0.35]`. Mic = 9, loopback = 10 on this laptop.
-- Pipeline (D-017/D-021): capture (PortAudio callback, 10 ms blocks) → per source: 16 kHz mono (soxr) + Silero VAD
-  segmenter (own model per source) → shared ASR thread (Whisper large-v3, GPU, int8_float32, beam 1, temp 0,
-  128-token cap, repetition guard) → translation thread (speaker label for system phrases: SpeechBrain ECAPA +
-  online clustering, D-023; then NLLB-200 600M, CPU int8) → terminal.
-  Keep-alive silence on the speakers while capturing loopback (D-019).
-- Output per block: `[hh:mm:ss] Me|Speaker ?`, HY, EN, `latency X s (ASR, translation, queue A+B)`.
-  Exit summary per source: detected / printed / discarded, PortAudio flags, latency median / max / % ≤ 5 s.
-- Key numbers: eval CER 8.6 % (10 sentences, laptop mic); live loopback = offline accuracy (Test A 5.7 % = 5.7 %);
-  one side talking: latency median 2.8 s, 100 % ≤ 5 s; overlap + echo: 64–70 % ≤ 5 s, max 8.7 s.
+## Known limitations (all in README)
+Natural-speech CER ~20 %; echo with a cable-mic headset; some repetition loops not caught (50 % unique words);
+5 s cut splits sentences (fragment translations); Russian words; overlap not tested with the current model;
+speaker ID only tested on 1–2 minute calls; Windows + NVIDIA only; NLLB non-commercial.
 
-## Code map
-- `hylive/audio_capture.py` — DeviceInfo, AudioChunk, get_device, default_mic, default_loopback, recordable_devices,
-  DeviceCapture, output_device_for_loopback, SilentOutput
-- `hylive/audio_convert.py` — to_float32_frames, to_mono, Resampler (soxr)
-- `hylive/segmenter.py` — Segment, load_vad_model, Segmenter (process, flush)
-- `hylive/asr.py` — Transcriber (transcribe, transcribe_full → AsrResult), MAX_NEW_TOKENS, MAX_COMPRESSION_RATIO
-- `hylive/translate.py` — Translator (NLLB via CTranslate2)
-- `hylive/speakers.py` — SpeakerEncoder (ECAPA), SpeakerTracker (threshold, short-phrase rule, count)
-- `hylive/gpu.py` — register_nvidia_dlls (must run before importing ctranslate2/faster_whisper)
-- `hylive/__main__.py` — CLI, threads, output, summary
-- `scripts/` — list_devices, record_test (--label, --keep-alive), convert_test, vad_test, asr_test, mt_test,
-  record_eval, eval_asr (--model, --beam-size, --prompt, --pad-ms, --translate), play_eval (--ids, --gap),
-  speaker_test (--thresholds), gpu_smoke_test
-- `recordings/20261027-184504_twowomen_system.wav` + segments (git-ignored): M5 test clip with ground truth
-- `eval/sentences.txt` (committed), `eval/audio/` (git-ignored)
+## NEXT — submission (in this order)
+1. Commit + push the final docs (check: no audio/model files tracked).
+2. Chat export → one .md per session in `chats/` (unedited) + update `chats/INDEX.md`; commit + push.
+3. Repository check (clean clone view on GitHub, README renders, no large/secret files); visibility as Mathrix
+   requires (public, or collaborator access).
+4. Submit the repository link to Mathrix. Record the final active time in TIMELOG.md.
+Not planned (time limit): echo filter, stricter loop filter, fresh-install check in a new folder.
 
-## Done (M5, 2026-10-27)
-Speaker identification works offline (3 recordings, 0 wrong labels) and live (L1b, L2); threshold 0.35; see D-023.
-Full application test L2: Me + Speaker 1 + Speaker 2 correct; latency Me 100 %, system 88 % ≤ 5 s.
-
-## Done since M5 (2026-10-27)
-- Echo check at interview volume: 0 echo phrases → keep current headphones, moderate volume (D-012).
-- Small fixes (D-025): "�" stripped, extra loop rule, torch.jit warning hidden. Eval CER 8.6 % unchanged.
-- Offline: `HF_HUB_OFFLINE=1` in the live program + `scripts/download_models.py`; Wi-Fi-off run passed (D-024).
-- Mixed Armenian/Russian/English checked and documented as a limitation (TESTS.md).
-
-## Done 2026-10-28 (translation accuracy, existing models only) — see TESTS.md + D-026
-- Tools: `eval/translations.txt` (EN references), chrF in `eval_asr.py --translate`, `--set natural`
-  (`eval/sentences_natural.txt`, `eval/translations_natural.txt`, audio `eval/audio/natural/`), `--mt-beam`,
-  `--whisper-translate`, `--normalize`, `--anti-repeat`; `record_eval.py --set`; `Transcriber(decode_options=…)`,
-  `Transcriber.translate_speech()` (tests only).
-- Baselines: read set CER 8.6 %, chrF 49.3, EN 2 correct / 3 gist / 5 wrong; natural set CER 27.2 % (pure Armenian
-  ≈ 12 %), chrF 32.8, EN 0 / 3 / 3. NLLB from correct Armenian: 10/10 and 6/6 understandable → Whisper errors are the cause.
-- ALREADY FAILED — do NOT repeat: Whisper beam 2/3/5, Armenian initial prompt, 300 ms padding, large-v3-turbo,
-  Whisper task="translate", NLLB beam 4, loudness normalisation, no_repeat_ngram_size/repetition_penalty,
-  word-specific correction lists (rejected on principle). New models: user decided NOT to download (keep setup light).
-- Live application unchanged (large-v3 beam 1, NLLB beam 2).
-
-## Done 2026-10-29/30
-- **ASR default switched to the Armenian fine-tuned Whisper turbo** (D-027): read CER 8.6 → 1.9 %, EN 2 → 9 of 10
-  correct; natural and fresh check sets also clearly better; ASR ~2× faster. + punctuation cleanup.
-- `scripts/download_models.py` now does the whole model setup (downloads + both conversions); tested OK.
-- Live mic test: 6/6 ≤ 5 s, median 1.9 s. Zoom (1 helper): 100 % ≤ 5 s on both sources, 0 audio problems, but
-  ECHO from the headset (≈ 6 of 14 "Me" blocks are the helper's words) and possibly one false "Speaker 2".
-
-## NEXT (2026-10-30) — STRICT 20 h LIMIT: only essentials, in this order
-0. Ask the user for today's/yesterday's active minutes (TIMELOG: no guessing).
-1. Echo — decide quickly (it makes wrong "Me" blocks in the interview):
-   a) earphones WITHOUT a mic (2-ring plug) → laptop mic is used, far from the earbuds; no code; re-test 1 min; or
-   b) simple echo filter (~30 min): drop/mark a "Me" phrase that overlaps in time with a call-side phrase and has
-      nearly the same text; measure once on a Zoom run; document either way.
-2. 3-person Zoom test (user + 2 helpers, ~10 min): labels stable, latency, queue, stability (RAM start/end).
-3. README update: new default model + reasons and numbers, one-script setup (`download_models.py` replaces the
-   separate converter command), Zoom audio setup, Zoom results, echo limitation, updated test tables; PLAN.md status.
-4. Commit + push (check: no audio/model files).
-5. Chat export → one .md per session in `chats/` (unedited) + `chats/INDEX.md`; commit + push.
-6. Repo visibility (still unclear from Mathrix: public or collaborators) → send the link. Deadline Nov 1 23:59.
-Skip unless time is left: fresh install in a new folder, cosmetic fixes ("(nothing recognised)" blocks, missed loops).
-
-## Then
-- Real call (Meet/Zoom) with 2 helpers (~10 min) — date to be set; fresh install in a new folder; rehearsal;
-  final chat export (after the last message) into `chats/` + `chats/INDEX.md`; answer from Mathrix (visibility, app).
-- Repository: https://github.com/EmmaHarutyunyan/live-speech-translation (private, pushed 2026-10-27).
-
-## OPEN ISSUES before submission (priority order)
-1. ~~Echo / headset mic~~ — echo check passed at interview volume (D-012); re-check in the real call. Was: get mic-less headphones (2-ring plug) or a TRRS→TRS adapter; then re-run
-   the real-world test (both streams) and re-measure latency and "Me" labelling.
-2. ~~M5 speaker identification~~ ✅ done 2026-10-27 (D-023). Remaining: 10+ min and real-call test.
-3. **Latency under overlapping speech (C-1):** 64–70 % ≤ 5 s with echo. Re-test echo-free; if still needed, consider
-   batching queued phrases on the GPU (faster-whisper batched mode) — verify first.
-4. **ASR accuracy limits (README):** word-initial Բ → Վ/dropped; single-letter errors flip the English meaning.
-   Optional if time: beam 5 with the shorter 5 s phrases (measure latency); community Armenian fine-tune.
-5. ~~Cosmetic~~ mostly done (D-025); `queue` shows stop signals at shutdown (cosmetic). Was: "�" at the end of phrases cut mid-word (strip U+FFFD or similar); "(cut at token limit)" flag
-   never appeared although one output looked truncated ("այդ հ") — check the approximate token count logic;
-   torch.jit / Hugging Face symlink + token warnings at start-up (document or silence via env vars).
-6. ~~Local-only check (C-2)~~ ✅ (D-024). Was: run with Wi-Fi off after all downloads; Hugging Face may try the network for the
-   tokenizer/models → test, possibly set `HF_HUB_OFFLINE=1`.
-7. **README** (setup incl. audio devices, keep-alive, models + alternatives + reasons with numbers, architecture,
-   limitations, improvements) — not started. PLAN.md milestone table is outdated (update or point to HANDOVER).
-8. **Fresh-setup check:** follow the README from scratch (new venv, `requirements.txt`, NLLB conversion with HF_HOME on D:).
-9. **Chats (deliverable):** test the export (Settings → Privacy → Export data) NOW; final export after the last
-   message; one .md per session in `chats/`, unedited; update `chats/INDEX.md` (so far 1 session).
-10. **Repo + Mathrix:** create the GitHub repo (private first, D-006); ask Mathrix: public vs. collaborator access,
-    and which calling app the interview uses (D-007).
-11. **Helpers:** 2 people for a test call (M5 test and final rehearsal); record one 2-voice call for offline tuning.
-12. Optional: Test B with eval clips + reading (clips as call side, known text for both sides).
-
-## Remaining time plan (≈ 9 h, target Oct 30)
-| When | Work | h |
-|---|---|---|
-| Oct 27 (rest) | small fixes, offline check | 0.5 |
-| Oct 28 | README; hardware fix + echo-free test | 2.5 |
-| Oct 29 | fresh-setup check, real call with 2 helpers, fixes | 2.5 |
-| Oct 30 | rehearsal, chat export, repo, submit | 2 |
-| | buffer | ~1.5 |
+- Repository: https://github.com/EmmaHarutyunyan/live-speech-translation

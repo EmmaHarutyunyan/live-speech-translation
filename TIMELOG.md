@@ -27,3 +27,17 @@ time. Other values are Claude's estimates from message times and are marked as s
 - Confirmed: **2.5 h** · Estimated (not confirmed): **~10.55 h** · Together: **~13.05 h** of ~20 h → **~6.95 h left**.
 - The 2026-10-29/30 block is added as soon as the user gives its active minutes (not guessed). Its clock span is
   2 h 47 min, so at most: ~15.8 h used, ≥ ~4.2 h left. Remaining = 6.95 h − active time of that block.
+
+### 2026-10-31 (final day)
+| Date | Start | End | Active h | Status | Milestone | Notes |
+|---|---|---|---|---|---|---|
+| 2026-10-31 | 15:19 | 15:57 | 0.5 | **user-stated** ("4 hours left" at 15:19 → "3.5 hours" at 15:57) | M6/M7 | 1 h ASR block (beam 5, D-028), cleanup, README rewrite |
+| 2026-10-31 | 15:57 | 16:45 | — | not counted (user: waiting for friends) | | |
+| 2026-10-31 | 16:45 | 17:40 | ~0.9 | estimate (clock span; user did not report breaks) | M6/M7 | Final 3-person Zoom test, final checks, documentation, cleanup review, submission preparation |
+
+**Totals (user's own count, 2026-10-31):** at 15:19 the user stated **4 h left of the 20 h limit (= 16.0 h used)**.
+This figure includes the 2026-10-28 and 2026-10-29/30 blocks above, whose individual active minutes were not given;
+it replaces the earlier estimates. At 16:45: 3.5 h left (16.5 h used). Time after 16:45 is added at the end.
+
+**Final total (2026-10-31, 17:40):** 16.5 h used by the user's own count at 16:45 + ~0.9 h (estimate) =
+**~17.4 h of the 20 h limit**. The remaining minutes for the chat export, commit and submission email are not added.

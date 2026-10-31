@@ -40,13 +40,15 @@ challenge on Windows 11 with an NVIDIA GTX 1060 (3 GB).
 Summary of the result (details in [Test results](#test-results)):
 - All required features work live: two audio sources at once, Armenian transcription, English translation,
   `Me` / `Speaker N` labels that stay stable within a session, live terminal output.
-- Latency: in the live and Zoom tests with the current model, every phrase appeared within 5 s (median 1.9–2.9 s).
+- Latency: in the live and Zoom tests with the current model (including a 3-person Zoom call), every phrase
+  appeared within 5 s (median 2.1–2.9 s).
   This is not guaranteed: one GPU transcribes one phrase at a time, and with the earlier, slower model overlapping
   speech produced delays of up to 8.7 s.
 - Accuracy is the main limitation. On clearly read sentences the character error rate (CER) is 1.3 %; on natural,
   fast speech it is about 20 %, and single wrong letters can change the meaning of the English translation.
 - Echo: in Zoom with a headset whose microphone sits on the earphone cable, the call leaked into the microphone and
-  was transcribed a second time as `Me` (see [Known limitations](#known-limitations)).
+  was transcribed a second time as `Me` (more than half of the `Me` blocks in the final test; see
+  [Known limitations](#known-limitations)).
 
 ---
 
@@ -261,20 +263,23 @@ Three 60–80 s interview recordings with known speaker changes (`scripts/speake
 | two women (laughing, overlap) | 0 | 0.51–0.88 | 0.16 |
 
 Thresholds 0.35 and 0.4 gave 0 errors on all three recordings; 0.2 merged two speakers and 0.55 created extra ones.
-Live runs on two of the recordings gave the correct speakers. In a Zoom test with one helper, one short phrase
-(similarity 0.27) created an extra `Speaker 2`.
+Live runs on two of the recordings gave the correct speakers. In the final 3-person Zoom test (two friends on the
+call side) the labels were correct: `Speaker 1` and `Speaker 2`, and Speaker 1 kept its label when returning after
+Speaker 2 (similarity 0.81). In earlier Zoom runs, a very short first phrase sometimes created an extra speaker.
 
 ### Latency (end of phrase → English line)
 
 | Run | Model | Within 5 s | Median | Max |
 |---|---|---|---|---|
 | Live microphone, 2026-10-31 | turbo-armenian, beam 5 | 8/8 | 2.1 s | 2.7 s |
+| **Zoom, 2 friends, fast natural speech (final test): `Me` / call side** | turbo-armenian, beam 5 | **22/22 / 11/11** | **2.6 / 2.7 s** | **4.1 / 3.3 s** |
 | Zoom, 1 helper (Z1): `Me` / call side | turbo-armenian, beam 1 | 9/9 / 5/5 | 2.5 / 3.0 s | 4.4 / 4.0 s |
 | Zoom, 1 helper, both talking (Z2): `Me` / call side | turbo-armenian, beam 1 | 14/14 / 8/8 | 2.2 / 2.9 s | 3.1 / 5.0 s |
 | Interview played as call side + my speech | large-v3, beam 1 | 18/20 | 3.0–4.1 s | 5.9 s |
 | Overlapping speech + echo (before later fixes) | large-v3, beam 1 | 64–70 % | 4.1–4.8 s | 8.7 s |
 
-The Zoom runs used beam 1, before beam 5 became the default; beam 5 adds ~0.1 s ASR time on the test sets.
+Z1 and Z2 used beam 1, before beam 5 became the default. In the final test, sentences cut at the 5 s limit gave
+most of the wrong translations (call side: ~6 correct, 2 gist, 3 wrong of 11, by my judgement; [TESTS.md](TESTS.md)).
 
 ### Other checks
 - Both sources captured at the same time with 0 lost audio blocks (PortAudio problem flags 0 in all runs).
@@ -286,8 +291,9 @@ The Zoom runs used beam 1, before beam 5 became the default; beam 5 adds ~0.1 s 
 - **Armenian accuracy on natural speech.** CER is ~20 % on fast colloquial speech (1.3 % on clear reading). One
   wrong letter can change the English meaning, and a wrongly added `՞` turns a statement into a question.
 - **Echo.** If call audio reaches the microphone, it is transcribed again as `Me` (echo handling is out of scope in
-  the brief). This happened in Zoom with a headset whose microphone is on the earphone cable: about 6 of 14 `Me`
-  blocks repeated the helper's words. Earphones without a microphone should avoid it but were not measured.
+  the brief). This happened in Zoom with a headset whose microphone is on the earphone cable: in the final 3-person
+  test, 13 of 22 `Me` blocks repeated the friends' words. An echo filter was not added because it would delay `Me`
+  lines and could not be tested before submission. Earphones without a microphone should avoid it but were not measured.
 - **Repetition filter.** It catches most Whisper loops but not all: a loop with 50 % different words was printed
   and translated (the filter needs < 40 %). A real phrase that repeats the same words many times could be discarded.
 - **Mixed languages.** Russian and English words inside Armenian (out of scope in the brief) are written in Armenian
@@ -296,8 +302,9 @@ The Zoom runs used beam 1, before beam 5 became the default; beam 5 adds ~0.1 s 
   phrases wait; the 5 s target is not guaranteed. The first phrase after start-up is also slower.
 - **Phrase cutting.** Phrases are cut at 5 s to keep latency down; long sentences are split, which makes some
   translations choppy. If the speaker changes inside a phrase, the whole phrase gets one label.
-- **Speaker identification** was tested on short recordings and Zoom calls with one other person; not on long
-  calls. Very short phrases can create an extra speaker or keep the closest known one.
+- **Speaker identification** was tested on short recordings and Zoom calls with up to two other people (1–2 minutes
+  each), not on long calls. Very short phrases can create an extra speaker or keep the closest known one.
+- **Overlapping speech** was not tested with the current model in the final Zoom test.
 - **Platform.** Windows only (WASAPI loopback), an NVIDIA GPU is required; tested on one laptop.
 - **NLLB licence** is non-commercial.
 

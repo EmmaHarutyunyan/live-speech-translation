@@ -330,3 +330,34 @@ All Zoom runs: 0 PortAudio problem flags, detected = printed, queue 0–1.
   correct for most sentences ("I was busy all day today.", "And we decided to meet next week."). Run 1 (short test
   words): «Խոս ափող» → "coast" (word split) and a repetition loop the filter missed («այդ համարվում է, …»: 50 %
   different words, filter threshold < 40 %) — documented limitation, filter not tightened (no time to test safely).
+
+## Final 3-person Zoom test (2026-10-31, Zoom desktop, user + 2 friends, default settings: turbo-armenian beam 5)
+Natural conversation, longer sentences, faster speech, frequent speaker switches. Headphone model and Zoom volume
+were not recorded. Overlapping speech was planned for the end but is not visible in the output.
+Full terminal output: `recordings/zoom3_final.txt` (trial run: `recordings/zoom3_trial.txt`; both git-ignored).
+| Run | Length | Me ≤ 5 s | Call side ≤ 5 s | Speakers | Echo |
+|---|---|---|---|---|---|
+| Z3 trial | 1 min 20 s | 15/15 (max 3.5 s) | 13/13 (max 4.9 s) | 3 labels for 2 friends: extra "Speaker 1" for the first «Բարև» | 10 of 15 "Me" blocks are friends' words |
+| **Z3 final** | 1 min 40 s | **22/22 (median 2.6 s, max 4.1 s)** | **11/11 (median 2.7 s, max 3.3 s)** | **2 for 2 friends, correct (user confirmed)**; Speaker 1 returned after Speaker 2 with the same label (similarity 0.81) | **13 of 22 "Me" blocks are friends' words** |
+Z3 final: 0 PortAudio problem flags, detected = printed on both sides, queue ≤ 2, 1 loop discarded correctly.
+- Call-side recognition mostly good on long, fast sentences; errors on similar sounds («արդյող» for «արդյոք»,
+  «Այժմիայն» for «ոչ միայն», «անրաբեռնված» for «ծանրաբեռնված»).
+- English, call side (Claude's judgement, 11 blocks): ~6 correct / 2 gist / 3 wrong. Most wrong ones are fragments
+  created by the 5 s phrase cut (e.g. «…ընտանիքի հետ ժամանակ անցկացնել» split → "That's when it's done.").
+- English, user's own speech (9 real "Me" blocks): ~5 correct / 2 gist / 2 wrong (short fragments); one translation
+  dropped the second half of a sentence; one question lost its question mark.
+- Trial run: a repetition loop with 50 % different words («համանական …») was not caught → long nonsense English
+  (4.9 s latency). Known limitation.
+- Saving the output with `| Tee-Object` lost the exit summary (Ctrl+C stops the pipe) → run without a pipe and copy
+  the terminal.
+- **Decision (user, 2026-10-31): no echo fix in code** — an echo filter would add latency and could not be tested
+  live before submission. Documented as a limitation; for the interview use earphones without a microphone.
+- This was the final live test before submission.
+
+## Final check before submission (2026-10-31, no code changes)
+- `eval_asr.py --model models\whisper-turbo-armenian-ct2 --beam-size 5` (read set), run twice: **CER 1.3 %, WER 8.2 %**
+  both times, ASR avg 0.97 s, max 1.02 s — identical to D-028 (deterministic).
+- Live `python -m hylive` (both sources, user speaking, call side silent): **9/9 ≤ 5 s, median 1.9 s, max 2.9 s**,
+  0 PortAudio problem flags, detected = printed. Long natural sentences mostly correct ("And I left home because
+  I didn't want to be late for work.", "But time passed so fast that we didn't even notice.").
+  2 of 9 blocks were repetition loops the filter did not catch («այդ համացնություններից այդ …») — known limitation.
