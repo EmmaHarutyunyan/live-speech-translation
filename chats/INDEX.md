@@ -14,4 +14,4 @@ for the interview — never delete or edit any session.
 ## Sessions
 | # | Started | Session name in app | Topic | Export file | Status |
 |---|---|---|---|---|---|
-| 01 | 2026-10-21 | (main session — fill in the name shown in the app) | Requirements, plan, environment check, M0 project files | `01-planning-and-setup.md` | not yet exported |
+| 01 | 2026-10-21 | main project session (the only session; used 2026-10-21 … 2026-10-31) | Whole project: requirements, plan, environment, all milestones, tests, documentation, submission | `01-live-armenian-translation.md` | exported 2026-10-31 (app export, unedited) |
